@@ -12,16 +12,13 @@ const Header = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Sparkles className="w-8 h-8 text-teal-400" />
-            <span className="text-2xl font-bold text-white">Envaita</span>
+            <span className="text-2xl font-bold text-white">NeJo</span>
           </div>
           
           <nav className="hidden md:flex items-center space-x-8">
-            <a href="#events" className="text-slate-300 hover:text-white transition-colors">Events</a>
-            <a href="#templates" className="text-slate-300 hover:text-white transition-colors">Templates</a>
-            <a href="#vendors" className="text-slate-300 hover:text-white transition-colors">Vendors</a>
-            <a href="#services" className="text-slate-300 hover:text-white transition-colors">Services</a>
-            <a href="#features" className="text-slate-300 hover:text-white transition-colors">Features</a>
-            <a href="#pricing" className="text-slate-300 hover:text-white transition-colors">Pricing</a>
+            <a href="/dashboard" className="text-slate-300 hover:text-white transition-colors">Events</a>
+            <a href="/templates" className="text-slate-300 hover:text-white transition-colors">Templates</a>
+            <a href="/pricing" className="text-slate-300 hover:text-white transition-colors">Pricing</a>
           </nav>
           
           <Button 
