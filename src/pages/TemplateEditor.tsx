@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Download, Send, QrCode, Save } from 'lucide-react';
+import { ArrowLeft, Download, Send, QrCode, Save, Upload, X } from 'lucide-react';
 import Header from '@/components/Header';
 import html2canvas from 'html2canvas';
 
@@ -14,6 +14,7 @@ const TemplateEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const cardRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [invitationData, setInvitationData] = useState({
     coupleName: 'James & Patricia',
@@ -24,11 +25,32 @@ const TemplateEditor = () => {
     receptionTime: '6:00PM',
     theme: 'Movie Stars',
     rsvpContact: '+255786543366',
-    additionalInfo: 'Kindly confirm your attendance'
+    additionalInfo: 'Kindly confirm your attendance',
+    invitingFamily: 'MR. & MRS. FRANCIS BROWN',
+    guestName: 'COLLINS VICTOR LEMA',
+    invitationImage: null as string | null
   });
 
   const handleInputChange = (field: string, value: string) => {
     setInvitationData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setInvitationData(prev => ({ ...prev, invitationImage: e.target?.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setInvitationData(prev => ({ ...prev, invitationImage: null }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleDownload = async () => {
@@ -47,7 +69,6 @@ const TemplateEditor = () => {
   };
 
   const handleSendInvitations = () => {
-    // This would integrate with your backend to send invitations
     console.log('Sending invitations with data:', invitationData);
     navigate('/preview-message');
   };
@@ -79,6 +100,28 @@ const TemplateEditor = () => {
               <h2 className="text-xl font-bold text-white mb-6">Event Details</h2>
               
               <div className="space-y-4">
+                <div>
+                  <Label htmlFor="invitingFamily" className="text-white">Inviting Family</Label>
+                  <Input
+                    id="invitingFamily"
+                    value={invitationData.invitingFamily}
+                    onChange={(e) => handleInputChange('invitingFamily', e.target.value)}
+                    className="bg-slate-700 border-slate-600 text-white mt-2"
+                    placeholder="e.g., MR. & MRS. FRANCIS BROWN"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="guestName" className="text-white">Guest Name</Label>
+                  <Input
+                    id="guestName"
+                    value={invitationData.guestName}
+                    onChange={(e) => handleInputChange('guestName', e.target.value)}
+                    className="bg-slate-700 border-slate-600 text-white mt-2"
+                    placeholder="e.g., COLLINS VICTOR LEMA"
+                  />
+                </div>
+
                 <div>
                   <Label htmlFor="coupleName" className="text-white">Couple Name / Event Title</Label>
                   <Input
@@ -170,6 +213,47 @@ const TemplateEditor = () => {
                     className="bg-slate-700 border-slate-600 text-white mt-2"
                   />
                 </div>
+
+                {/* Image Upload Section */}
+                <div>
+                  <Label className="text-white">Invitation Image</Label>
+                  <div className="mt-2">
+                    {!invitationData.invitationImage ? (
+                      <div className="border-2 border-dashed border-slate-600 rounded-lg p-6 text-center">
+                        <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                        <p className="text-slate-300 mb-2">Upload an image for your invitation</p>
+                        <Button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          Choose Image
+                        </Button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <img
+                          src={invitationData.invitationImage}
+                          alt="Invitation"
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                        <Button
+                          onClick={removeImage}
+                          size="sm"
+                          className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white p-1"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </Card>
 
@@ -198,48 +282,61 @@ const TemplateEditor = () => {
               
               <div 
                 ref={cardRef}
-                className="bg-gradient-to-br from-slate-700 to-slate-800 p-8 rounded-lg text-center border border-slate-600 shadow-2xl"
+                className="bg-gradient-to-br from-slate-700 to-slate-800 p-8 rounded-lg text-center border border-slate-600 shadow-2xl relative overflow-hidden"
                 style={{
                   backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.05"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'
                 }}
               >
-                <div className="mb-6">
-                  <p className="text-teal-400 text-sm uppercase tracking-wider mb-2">Lights, Camera, Love</p>
-                  <p className="text-white text-xs opacity-75 mb-1">THE FAMILY OF</p>
-                  <p className="text-white text-xs opacity-75">MR. & MRS. FRANCIS BROWN</p>
-                  <p className="text-white text-xs opacity-75 mb-4">CORDIALLY INVITES</p>
-                  <h1 className="text-white text-xs uppercase tracking-wide mb-2">COLLINS VICTOR LEMA</h1>
-                </div>
+                {/* Background Image */}
+                {invitationData.invitationImage && (
+                  <div className="absolute inset-0 opacity-20">
+                    <img
+                      src={invitationData.invitationImage}
+                      alt="Background"
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  </div>
+                )}
                 
-                <div className="mb-6">
-                  <p className="text-white text-xs mb-1">TO THE WEDDING CEREMONY</p>
-                  <p className="text-white text-xs mb-1">OF THEIR BELOVED CHILDREN</p>
-                  
-                  <div className="my-6">
-                    <h2 className="text-white text-2xl font-script mb-2">{invitationData.coupleName}</h2>
+                <div className="relative z-10">
+                  <div className="mb-6">
+                    <p className="text-teal-400 text-sm uppercase tracking-wider mb-2">Lights, Camera, Love</p>
+                    <p className="text-white text-xs opacity-75 mb-1">THE FAMILY OF</p>
+                    <p className="text-white text-xs opacity-75 mb-4">{invitationData.invitingFamily}</p>
+                    <p className="text-white text-xs opacity-75 mb-4">CORDIALLY INVITES</p>
+                    <h1 className="text-white text-xs uppercase tracking-wide mb-2">{invitationData.guestName}</h1>
                   </div>
                   
-                  <p className="text-white text-xs mb-1">AS THEY EXCHANGE THEIR VOWS</p>
-                  <p className="text-white text-xs mb-1">ON {invitationData.eventDate.toUpperCase()}</p>
-                  <p className="text-white text-xs mb-1">{invitationData.eventTime}, {invitationData.venue.toUpperCase()}</p>
-                  <p className="text-white text-xs mb-1">FOLLOWED BY RECEPTION</p>
-                  <p className="text-white text-xs mb-6">AT {invitationData.receptionTime}, {invitationData.reception.toUpperCase()}</p>
-                  
-                  <p className="text-white text-xs mb-4">THEME: {invitationData.theme.toUpperCase()}</p>
-                  
-                  <div className="border-t border-white/20 pt-4 mb-4">
-                    <p className="text-white text-xs mb-2">RSVP:</p>
-                    <p className="text-teal-400 text-xs font-mono">CYNTHIA PONERA {invitationData.rsvpContact}</p>
-                    <p className="text-teal-400 text-xs font-mono">CHRISTINA BESSY +255634231181</p>
-                  </div>
-                  
-                  <div className="flex justify-center mb-4">
-                    <div className="w-16 h-16 bg-white/90 rounded flex items-center justify-center">
-                      <QrCode className="w-12 h-12 text-slate-900" />
+                  <div className="mb-6">
+                    <p className="text-white text-xs mb-1">TO THE WEDDING CEREMONY</p>
+                    <p className="text-white text-xs mb-1">OF THEIR BELOVED CHILDREN</p>
+                    
+                    <div className="my-6">
+                      <h2 className="text-white text-2xl font-script mb-2">{invitationData.coupleName}</h2>
                     </div>
+                    
+                    <p className="text-white text-xs mb-1">AS THEY EXCHANGE THEIR VOWS</p>
+                    <p className="text-white text-xs mb-1">ON {invitationData.eventDate.toUpperCase()}</p>
+                    <p className="text-white text-xs mb-1">{invitationData.eventTime}, {invitationData.venue.toUpperCase()}</p>
+                    <p className="text-white text-xs mb-1">FOLLOWED BY RECEPTION</p>
+                    <p className="text-white text-xs mb-6">AT {invitationData.receptionTime}, {invitationData.reception.toUpperCase()}</p>
+                    
+                    <p className="text-white text-xs mb-4">THEME: {invitationData.theme.toUpperCase()}</p>
+                    
+                    <div className="border-t border-white/20 pt-4 mb-4">
+                      <p className="text-white text-xs mb-2">RSVP:</p>
+                      <p className="text-teal-400 text-xs font-mono">CYNTHIA PONERA {invitationData.rsvpContact}</p>
+                      <p className="text-teal-400 text-xs font-mono">CHRISTINA BESSY +255634231181</p>
+                    </div>
+                    
+                    <div className="flex justify-center mb-4">
+                      <div className="w-16 h-16 bg-white/90 rounded flex items-center justify-center">
+                        <QrCode className="w-12 h-12 text-slate-900" />
+                      </div>
+                    </div>
+                    
+                    <p className="text-white text-xs bg-slate-900/50 px-2 py-1 rounded">SINGLE</p>
                   </div>
-                  
-                  <p className="text-white text-xs bg-slate-900/50 px-2 py-1 rounded">SINGLE</p>
                 </div>
               </div>
             </Card>

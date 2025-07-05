@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +13,8 @@ const MessagePreview = () => {
     name: 'Collins Victor Lema',
     phone: '+255786543366',
     eventTitle: 'James & Patricia Wedding',
-    eventDate: 'Saturday 5th July, 2025'
+    eventDate: 'Saturday 5th July, 2025',
+    invitationImage: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=300&fit=crop'
   };
 
   const whatsappMessage = `🎉 Habari ${sampleGuest.name}!
@@ -29,7 +29,6 @@ IMETUMWA NA ENVAITA`;
 
   const handleResponse = (response: 'accept' | 'decline') => {
     setSelectedResponse(response);
-    // This would typically call your backend API
     console.log(`Guest ${response}ed the invitation`);
   };
 
@@ -80,6 +79,16 @@ IMETUMWA NA ENVAITA`;
                 
                 <div className="space-y-4">
                   <div className="bg-slate-800 rounded-lg p-3 max-w-xs">
+                    {/* Image in WhatsApp message */}
+                    {sampleGuest.invitationImage && (
+                      <div className="mb-3">
+                        <img
+                          src={sampleGuest.invitationImage}
+                          alt="Invitation preview"
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                      </div>
+                    )}
                     <p className="text-white text-sm whitespace-pre-line">{whatsappMessage}</p>
                     <p className="text-slate-400 text-xs mt-2">17:38</p>
                   </div>
@@ -149,7 +158,6 @@ IMETUMWA NA ENVAITA`;
             </Card>
           </div>
 
-          {/* RSVP Form Preview */}
           <div className="space-y-6">
             <Card className="bg-slate-800 border-slate-700 p-6">
               <h2 className="text-xl font-bold text-white mb-6">RSVP Form Preview</h2>
