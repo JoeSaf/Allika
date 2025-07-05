@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -62,6 +63,9 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				}
+			},
+			fontFamily: {
+				'script': ['Dancing Script', 'Brush Script MT', 'cursive'],
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
