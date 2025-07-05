@@ -27,11 +27,17 @@ const Header = () => {
               onClick={() => navigate('/')}
             >
               <Sparkles className="w-8 h-8 text-teal-400" />
-              <span className="text-2xl font-bold text-white">NeJo</span>
+              <span className="text-2xl font-bold text-white">Alika</span>
             </div>
             
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-8">
+              <button 
+                onClick={() => navigate('/')}
+                className="text-slate-300 hover:text-white transition-colors duration-200 hover:scale-105"
+              >
+                Home
+              </button>
               <button 
                 onClick={() => navigate('/dashboard')}
                 className="text-slate-300 hover:text-white transition-colors duration-200 hover:scale-105"
@@ -76,6 +82,12 @@ const Header = () => {
           <div className="md:hidden border-t border-slate-700/50">
             <div className="px-6 py-4 bg-slate-900/90 backdrop-blur-md rounded-b-2xl">
               <nav className="flex flex-col space-y-4">
+                <button 
+                  onClick={() => handleNavigation('/')}
+                  className="text-slate-300 hover:text-white transition-colors duration-200 text-left"
+                >
+                  Home
+                </button>
                 <button 
                   onClick={() => handleNavigation('/dashboard')}
                   className="text-slate-300 hover:text-white transition-colors duration-200 text-left"

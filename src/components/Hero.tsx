@@ -32,7 +32,7 @@ const Hero = () => {
         </h1>
         
         <p className="text-xl text-slate-300 max-w-4xl mx-auto mb-8 leading-relaxed">
-          Dive into the ultimate event experience with Envaita! We make it easy to create memorable events with our custom invitation templates, attendee management, and real-time RSVP tracking.
+          Dive into the ultimate event experience with Alika! We make it easy to create memorable events with our custom invitation templates, attendee management, and real-time RSVP tracking.
         </p>
         
         <Button 
