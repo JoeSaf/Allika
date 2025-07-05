@@ -10,6 +10,8 @@ import Templates from "./pages/Templates";
 import TemplateEditor from "./pages/TemplateEditor";
 import MessagePreview from "./pages/MessagePreview";
 import Pricing from "./pages/Pricing";
+import ViewAnalytics from "./pages/ViewAnalytics";
+import QrScanner from "./pages/QrScanner";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +29,8 @@ const App = () => (
           <Route path="/template/:id" element={<TemplateEditor />} />
           <Route path="/preview-message" element={<MessagePreview />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/view-analytics" element={<ViewAnalytics />} />
+          <Route path="/qr-scanner" element={<QrScanner />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
