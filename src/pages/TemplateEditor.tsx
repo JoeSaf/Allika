@@ -14,9 +14,11 @@ import html2canvas from 'html2canvas';
 const TemplateEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const cardRef = useRef<HTMLDivElement>(null);
-  const rsvpRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cardRef = useRef(null);
+  const rsvpRef = useRef(null);
+  const fileInputRef = useRef(null);
+  
+  const [selectedTemplate, setSelectedTemplate] = useState('template1');
   
   const [invitationData, setInvitationData] = useState({
     coupleName: 'James & Patricia',
@@ -30,7 +32,7 @@ const TemplateEditor = () => {
     additionalInfo: 'Kindly confirm your attendance',
     invitingFamily: 'MR. & MRS. FRANCIS BROWN',
     guestName: 'COLLINS VICTOR LEMA',
-    invitationImage: null as string | null
+    invitationImage: null
   });
 
   const [rsvpData, setRsvpData] = useState({
@@ -46,37 +48,46 @@ const TemplateEditor = () => {
     specialRequestsEnabled: true,
     specialRequestsLabel: 'Special requests or dietary restrictions',
     specialRequestsPlaceholder: 'Let us know if you have any special requirements...',
-    additionalFields: [] as Array<{
-      id: string;
-      label: string;
-      type: 'text' | 'textarea' | 'select';
-      required: boolean;
-      options?: string[];
-    }>,
+    additionalFields: [],
     submitButtonText: 'Submit RSVP',
     thankYouMessage: 'Thank you for your response! We look forward to celebrating with you.',
-    backgroundColor: '#334155', // slate-700
+    backgroundColor: '#334155',
     textColor: '#ffffff',
-    buttonColor: '#0d9488', // teal-600
-    accentColor: '#14b8a6' // teal-500
+    buttonColor: '#0d9488',
+    accentColor: '#14b8a6'
   });
 
   const [activeTab, setActiveTab] = useState('invitation');
 
-  const handleInputChange = (field: string, value: string) => {
+  const templates = {
+    template1: {
+      name: 'Classic Portrait',
+      description: 'Traditional vertical layout with centered content'
+    },
+    template2: {
+      name: 'Modern Landscape', 
+      description: 'Horizontal layout with image and text side by side'
+    },
+    template3: {
+      name: 'Artistic Layout',
+      description: 'Creative asymmetric design with dynamic positioning'
+    }
+  };
+
+  const handleInputChange = (field, value) => {
     setInvitationData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleRsvpChange = (field: string, value: any) => {
+  const handleRsvpChange = (field, value) => {
     setRsvpData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (event) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setInvitationData(prev => ({ ...prev, invitationImage: e.target?.result as string }));
+        setInvitationData(prev => ({ ...prev, invitationImage: e.target?.result }));
       };
       reader.readAsDataURL(file);
     }
@@ -97,14 +108,14 @@ const TemplateEditor = () => {
     }));
   };
 
-  const removeGuestCountOption = (index: number) => {
+  const removeGuestCountOption = (index) => {
     setRsvpData(prev => ({
       ...prev,
       guestCountOptions: prev.guestCountOptions.filter((_, i) => i !== index)
     }));
   };
 
-  const updateGuestCountOption = (index: number, value: string) => {
+  const updateGuestCountOption = (index, value) => {
     setRsvpData(prev => ({
       ...prev,
       guestCountOptions: prev.guestCountOptions.map((option, i) => 
@@ -117,7 +128,7 @@ const TemplateEditor = () => {
     const newField = {
       id: `field-${Date.now()}`,
       label: 'New Field',
-      type: 'text' as const,
+      type: 'text',
       required: false
     };
     setRsvpData(prev => ({
@@ -126,7 +137,7 @@ const TemplateEditor = () => {
     }));
   };
 
-  const updateAdditionalField = (id: string, updates: Partial<typeof rsvpData.additionalFields[0]>) => {
+  const updateAdditionalField = (id, updates) => {
     setRsvpData(prev => ({
       ...prev,
       additionalFields: prev.additionalFields.map(field =>
@@ -135,14 +146,213 @@ const TemplateEditor = () => {
     }));
   };
 
-  const removeAdditionalField = (id: string) => {
+  const removeAdditionalField = (id) => {
     setRsvpData(prev => ({
       ...prev,
       additionalFields: prev.additionalFields.filter(field => field.id !== id)
     }));
   };
 
-  const handleDownload = async (type: 'invitation' | 'rsvp' = 'invitation') => {
+  // Template 1: Classic Portrait (Original design)
+  const renderTemplate1 = () => (
+    <div 
+      className="bg-gradient-to-br from-slate-700 to-slate-800 p-8 rounded-lg text-center border border-slate-600 shadow-2xl relative overflow-hidden"
+      style={{
+        backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.05"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'
+      }}
+    >
+      {invitationData.invitationImage && (
+        <div className="absolute inset-0 opacity-20">
+          <img
+            src={invitationData.invitationImage}
+            alt="Background"
+            className="w-full h-full object-cover rounded-lg"
+          />
+        </div>
+      )}
+      
+      <div className="relative z-10">
+        <div className="mb-6">
+          <p className="text-teal-400 text-sm uppercase tracking-wider mb-2">Lights, Camera, Love</p>
+          <p className="text-white text-xs opacity-75 mb-1">THE FAMILY OF</p>
+          <p className="text-white text-xs opacity-75 mb-4">{invitationData.invitingFamily}</p>
+          <p className="text-white text-xs opacity-75 mb-4">CORDIALLY INVITES</p>
+          <h1 className="text-white text-xs uppercase tracking-wide mb-2">{invitationData.guestName}</h1>
+        </div>
+        
+        <div className="mb-6">
+          <p className="text-white text-xs mb-1">TO THE WEDDING CEREMONY</p>
+          <p className="text-white text-xs mb-1">OF THEIR BELOVED CHILDREN</p>
+          
+          <div className="my-6">
+            <h2 className="text-white text-2xl font-script mb-2">{invitationData.coupleName}</h2>
+          </div>
+          
+          <p className="text-white text-xs mb-1">AS THEY EXCHANGE THEIR VOWS</p>
+          <p className="text-white text-xs mb-1">ON {invitationData.eventDate.toUpperCase()}</p>
+          <p className="text-white text-xs mb-1">{invitationData.eventTime}, {invitationData.venue.toUpperCase()}</p>
+          <p className="text-white text-xs mb-1">FOLLOWED BY RECEPTION</p>
+          <p className="text-white text-xs mb-6">AT {invitationData.receptionTime}, {invitationData.reception.toUpperCase()}</p>
+          
+          <p className="text-white text-xs mb-4">THEME: {invitationData.theme.toUpperCase()}</p>
+          
+          <div className="border-t border-white/20 pt-4 mb-4">
+            <p className="text-white text-xs mb-2">RSVP:</p>
+            <p className="text-teal-400 text-xs font-mono">{invitationData.rsvpContact}</p>
+          </div>
+          
+          <div className="flex justify-center mb-4">
+            <div className="w-16 h-16 bg-white/90 rounded flex items-center justify-center">
+              <QrCode className="w-12 h-12 text-slate-900" />
+            </div>
+          </div>
+          
+          <p className="text-white text-xs bg-slate-900/50 px-2 py-1 rounded">SINGLE</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Template 2: Modern Landscape
+  const renderTemplate2 = () => (
+    <div className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-lg border border-slate-600 shadow-2xl relative overflow-hidden min-h-[500px]">
+      <div className="grid grid-cols-2 h-full">
+        {/* Left side - Image */}
+        <div className="relative bg-slate-600 flex items-center justify-center">
+          {invitationData.invitationImage ? (
+            <img
+              src={invitationData.invitationImage}
+              alt="Invitation"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="text-slate-400 text-center">
+              <Upload className="w-16 h-16 mx-auto mb-4" />
+              <p>Your image will appear here</p>
+            </div>
+          )}
+        </div>
+        
+        {/* Right side - Text */}
+        <div className="p-6 flex flex-col justify-center text-center">
+          <div className="mb-4">
+            <p className="text-teal-400 text-sm uppercase tracking-wider mb-2">Save The Date</p>
+            <h2 className="text-white text-3xl font-bold mb-2">{invitationData.coupleName}</h2>
+            <p className="text-white text-lg mb-4">{invitationData.eventDate}</p>
+          </div>
+          
+          <div className="mb-4">
+            <p className="text-white text-sm mb-1">CEREMONY: {invitationData.eventTime}</p>
+            <p className="text-white text-sm mb-1">{invitationData.venue}</p>
+            <p className="text-white text-sm mb-1">RECEPTION: {invitationData.receptionTime}</p>
+            <p className="text-white text-sm mb-4">{invitationData.reception}</p>
+          </div>
+          
+          <div className="border-t border-white/20 pt-4">
+            <p className="text-white text-sm mb-1">THEME: {invitationData.theme}</p>
+            <p className="text-teal-400 text-sm">{invitationData.rsvpContact}</p>
+          </div>
+          
+          <div className="mt-4">
+            <div className="w-12 h-12 bg-white/90 rounded mx-auto flex items-center justify-center">
+              <QrCode className="w-8 h-8 text-slate-900" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Template 3: Artistic Layout
+  const renderTemplate3 = () => (
+    <div className="bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 rounded-lg border border-slate-600 shadow-2xl relative overflow-hidden min-h-[600px]">
+      <div className="absolute inset-0">
+        <div className="absolute top-4 right-4 w-32 h-32 bg-teal-500/20 rounded-full blur-xl"></div>
+        <div className="absolute bottom-4 left-4 w-24 h-24 bg-purple-500/20 rounded-full blur-xl"></div>
+      </div>
+      
+      <div className="relative z-10 p-8">
+        {/* Header Section */}
+        <div className="mb-8">
+          <p className="text-teal-400 text-sm uppercase tracking-wider mb-2">You're Invited</p>
+          <h1 className="text-white text-4xl font-bold mb-2">{invitationData.coupleName}</h1>
+          <p className="text-white text-xl">{invitationData.eventDate}</p>
+        </div>
+        
+        {/* Content Grid */}
+        <div className="grid grid-cols-3 gap-6">
+          {/* Left Column */}
+          <div className="col-span-1">
+            {invitationData.invitationImage ? (
+              <img
+                src={invitationData.invitationImage}
+                alt="Invitation"
+                className="w-full h-40 object-cover rounded-lg shadow-lg"
+              />
+            ) : (
+              <div className="w-full h-40 bg-slate-600 rounded-lg flex items-center justify-center">
+                <Upload className="w-12 h-12 text-slate-400" />
+              </div>
+            )}
+            
+            <div className="mt-4 text-center">
+              <div className="w-16 h-16 bg-white/90 rounded-lg mx-auto flex items-center justify-center">
+                <QrCode className="w-12 h-12 text-slate-900" />
+              </div>
+            </div>
+          </div>
+          
+          {/* Right Columns */}
+          <div className="col-span-2">
+            <div className="bg-black/20 rounded-lg p-6 backdrop-blur-sm">
+              <div className="mb-6">
+                <p className="text-white text-sm mb-2">CEREMONY</p>
+                <p className="text-white font-semibold">{invitationData.eventTime}</p>
+                <p className="text-white text-sm">{invitationData.venue}</p>
+              </div>
+              
+              <div className="mb-6">
+                <p className="text-white text-sm mb-2">RECEPTION</p>
+                <p className="text-white font-semibold">{invitationData.receptionTime}</p>
+                <p className="text-white text-sm">{invitationData.reception}</p>
+              </div>
+              
+              <div className="mb-6">
+                <p className="text-white text-sm mb-2">THEME</p>
+                <p className="text-teal-400 font-semibold">{invitationData.theme}</p>
+              </div>
+              
+              <div className="border-t border-white/20 pt-4">
+                <p className="text-white text-sm mb-1">RSVP</p>
+                <p className="text-teal-400 font-mono">{invitationData.rsvpContact}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Guest Info */}
+        <div className="mt-8 text-center">
+          <p className="text-white text-sm opacity-75">Guest: {invitationData.guestName}</p>
+          <p className="text-white text-xs opacity-50 mt-2">{invitationData.additionalInfo}</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderInvitationPreview = () => {
+    switch (selectedTemplate) {
+      case 'template1':
+        return renderTemplate1();
+      case 'template2':
+        return renderTemplate2();
+      case 'template3':
+        return renderTemplate3();
+      default:
+        return renderTemplate1();
+    }
+  };
+
+  const handleDownload = async (type = 'invitation') => {
     const ref = type === 'invitation' ? cardRef : rsvpRef;
     if (ref.current) {
       const canvas = await html2canvas(ref.current, {
@@ -204,6 +414,36 @@ const TemplateEditor = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Invitation Form Panel */}
               <div className="space-y-6">
+                {/* Template Selection */}
+                <Card className="bg-slate-800 border-slate-700 p-6">
+                  <h2 className="text-xl font-bold text-white mb-6">Choose Template Style</h2>
+                  <div className="space-y-4">
+                    {Object.entries(templates).map(([key, template]) => (
+                      <div
+                        key={key}
+                        className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                          selectedTemplate === key
+                            ? 'border-teal-500 bg-teal-500/10'
+                            : 'border-slate-600 hover:border-slate-500'
+                        }`}
+                        onClick={() => setSelectedTemplate(key)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-4 h-4 rounded-full border-2 ${
+                            selectedTemplate === key
+                              ? 'border-teal-500 bg-teal-500'
+                              : 'border-slate-400'
+                          }`} />
+                          <div>
+                            <h3 className="text-white font-semibold">{template.name}</h3>
+                            <p className="text-slate-400 text-sm">{template.description}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+
                 <Card className="bg-slate-800 border-slate-700 p-6">
                   <h2 className="text-xl font-bold text-white mb-6">Event Details</h2>
                   
@@ -370,7 +610,7 @@ const TemplateEditor = () => {
               <div className="sticky top-8">
                 <Card className="bg-slate-800 border-slate-700 p-6">
                   <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-white">Invitation Preview</h2>
+                    <h2 className="text-xl font-bold text-white">Preview: {templates[selectedTemplate].name}</h2>
                     <Button
                       onClick={() => handleDownload('invitation')}
                       size="sm"
@@ -381,63 +621,8 @@ const TemplateEditor = () => {
                     </Button>
                   </div>
                   
-                  <div 
-                    ref={cardRef}
-                    className="bg-gradient-to-br from-slate-700 to-slate-800 p-8 rounded-lg text-center border border-slate-600 shadow-2xl relative overflow-hidden"
-                    style={{
-                      backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.05"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'
-                    }}
-                  >
-                    {/* Background Image */}
-                    {invitationData.invitationImage && (
-                      <div className="absolute inset-0 opacity-20">
-                        <img
-                          src={invitationData.invitationImage}
-                          alt="Background"
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="relative z-10">
-                      <div className="mb-6">
-                        <p className="text-teal-400 text-sm uppercase tracking-wider mb-2">Lights, Camera, Love</p>
-                        <p className="text-white text-xs opacity-75 mb-1">THE FAMILY OF</p>
-                        <p className="text-white text-xs opacity-75 mb-4">{invitationData.invitingFamily}</p>
-                        <p className="text-white text-xs opacity-75 mb-4">CORDIALLY INVITES</p>
-                        <h1 className="text-white text-xs uppercase tracking-wide mb-2">{invitationData.guestName}</h1>
-                      </div>
-                      
-                      <div className="mb-6">
-                        <p className="text-white text-xs mb-1">TO THE WEDDING CEREMONY</p>
-                        <p className="text-white text-xs mb-1">OF THEIR BELOVED CHILDREN</p>
-                        
-                        <div className="my-6">
-                          <h2 className="text-white text-2xl font-script mb-2">{invitationData.coupleName}</h2>
-                        </div>
-                        
-                        <p className="text-white text-xs mb-1">AS THEY EXCHANGE THEIR VOWS</p>
-                        <p className="text-white text-xs mb-1">ON {invitationData.eventDate.toUpperCase()}</p>
-                        <p className="text-white text-xs mb-1">{invitationData.eventTime}, {invitationData.venue.toUpperCase()}</p>
-                        <p className="text-white text-xs mb-1">FOLLOWED BY RECEPTION</p>
-                        <p className="text-white text-xs mb-6">AT {invitationData.receptionTime}, {invitationData.reception.toUpperCase()}</p>
-                        
-                        <p className="text-white text-xs mb-4">THEME: {invitationData.theme.toUpperCase()}</p>
-                        
-                        <div className="border-t border-white/20 pt-4 mb-4">
-                          <p className="text-white text-xs mb-2">RSVP:</p>
-                          <p className="text-teal-400 text-xs font-mono">{invitationData.rsvpContact}</p>
-                        </div>
-                        
-                        <div className="flex justify-center mb-4">
-                          <div className="w-16 h-16 bg-white/90 rounded flex items-center justify-center">
-                            <QrCode className="w-12 h-12 text-slate-900" />
-                          </div>
-                        </div>
-                        
-                        <p className="text-white text-xs bg-slate-900/50 px-2 py-1 rounded">SINGLE</p>
-                      </div>
-                    </div>
+                  <div ref={cardRef}>
+                    {renderInvitationPreview()}
                   </div>
                 </Card>
               </div>
@@ -643,7 +828,7 @@ const TemplateEditor = () => {
                                 <Label className="text-white text-sm">Field Type</Label>
                                 <select
                                   value={field.type}
-                                  onChange={(e) => updateAdditionalField(field.id, { type: e.target.value as any })}
+                                  onChange={(e) => updateAdditionalField(field.id, { type: e.target.value })}
                                   className="w-full bg-slate-600 border border-slate-500 text-white rounded-md p-2 mt-1"
                                 >
                                   <option value="text">Text</option>
@@ -949,7 +1134,7 @@ const TemplateEditor = () => {
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 mt-8">
           <Button 
-            onClick={() => handleDownload(activeTab as 'invitation' | 'rsvp')}
+            onClick={() => handleDownload(activeTab === 'invitation' ? 'invitation' : 'rsvp')}
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
           >
             <Download className="w-4 h-4 mr-2" />
