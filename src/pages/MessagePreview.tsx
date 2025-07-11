@@ -2,90 +2,48 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Send, MessageCircle, CheckCircle, XCircle, Download, BarChart3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Send, MessageCircle, CheckCircle, XCircle, BarChart3 } from 'lucide-react';
 import Header from '@/components/Header';
-
-interface TemplateData {
-  invitationData: {
-    coupleName: string;
-    eventDate: string;
-    eventTime: string;
-    venue: string;
-    reception: string;
-    receptionTime: string;
-    theme: string;
-    rsvpContact: string;
-    additionalInfo: string;
-    invitingFamily: string;
-    guestName: string;
-    invitationImage: string | null;
-  };
-  rsvpData: {
-    title: string;
-    subtitle: string;
-    location: string;
-    welcomeMessage: string;
-    confirmText: string;
-    declineText: string;
-    guestCountEnabled: boolean;
-    guestCountLabel: string;
-    guestCountOptions: string[];
-    specialRequestsEnabled: boolean;
-    specialRequestsLabel: string;
-    specialRequestsPlaceholder: string;
-    additionalFields: Array<{
-      id: string;
-      label: string;
-      type: 'text' | 'textarea' | 'select';
-      required: boolean;
-      options?: string[];
-    }>;
-    submitButtonText: string;
-    thankYouMessage: string;
-    backgroundColor: string;
-    textColor: string;
-    buttonColor: string;
-    accentColor: string;
-  };
-}
+import { getCurrentEvent, updateAnalytics, getEventAnalytics } from '@/utils/storage';
 
 const MessagePreview = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [selectedResponse, setSelectedResponse] = useState<'accept' | 'decline' | null>(null);
+  const [currentEvent, setCurrentEvent] = useState(null);
   const [eventStats, setEventStats] = useState({
     messagesSent: 0,
     delivered: 0,
     read: 0,
     responded: 0
   });
-  
-  // Get template data from navigation state
-  const templateData = location.state?.templateData as TemplateData | undefined;
 
-  // Load event statistics from localStorage
   useEffect(() => {
-    const events = JSON.parse(localStorage.getItem('events') || '[]');
-    const guests = JSON.parse(localStorage.getItem('guests') || '[]');
-    
-    if (events.length > 0 && guests.length > 0) {
-      const totalGuests = guests.length;
-      const deliveredRate = 0.75; // 75% delivery rate
-      const readRate = 0.57; // 57% read rate  
-      const responseRate = 0.36; // 36% response rate
-      
-      setEventStats({
-        messagesSent: totalGuests,
-        delivered: Math.floor(totalGuests * deliveredRate),
-        read: Math.floor(totalGuests * readRate),
-        responded: Math.floor(totalGuests * responseRate)
-      });
-    }
+    loadEventData();
   }, []);
 
-  // If no template data, show empty state
-  if (!templateData) {
+  const loadEventData = () => {
+    const event = getCurrentEvent();
+    if (!event) return;
+    
+    setCurrentEvent(event);
+    
+    // Update and get analytics
+    updateAnalytics(event);
+    const analytics = getEventAnalytics(event.id);
+    
+    if (analytics) {
+      setEventStats({
+        messagesSent: analytics.messagesSent,
+        delivered: analytics.delivered,
+        read: analytics.read,
+        responded: analytics.responded
+      });
+    }
+  };
+
+  // If no event selected, show empty state
+  if (!currentEvent) {
     return (
       <div className="min-h-screen bg-slate-900">
         <Header />
@@ -94,26 +52,26 @@ const MessagePreview = () => {
           <div className="flex items-center gap-4 mb-8">
             <Button 
               variant="outline" 
-              onClick={() => navigate('/templates')}
+              onClick={() => navigate('/dashboard')}
               className="border-slate-600 text-slate-300 hover:bg-slate-700"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Templates
+              Back to Dashboard
             </Button>
             <div>
               <h1 className="text-3xl font-bold text-white">Message Preview</h1>
-              <p className="text-slate-300">No template data available</p>
+              <p className="text-slate-300">No event selected</p>
             </div>
           </div>
 
           <Card className="bg-slate-800 border-slate-700 p-8 text-center">
-            <h2 className="text-xl font-bold text-white mb-4">No Template Selected</h2>
-            <p className="text-slate-300 mb-6">Please select a template from the template editor to preview messages.</p>
+            <h2 className="text-xl font-bold text-white mb-4">No Event Selected</h2>
+            <p className="text-slate-300 mb-6">Please select an event from the dashboard to preview messages.</p>
             <Button 
-              onClick={() => navigate('/templates')}
+              onClick={() => navigate('/dashboard')}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
-              Choose Template
+              Go to Dashboard
             </Button>
           </Card>
         </div>
@@ -121,23 +79,23 @@ const MessagePreview = () => {
     );
   }
 
-  const { invitationData, rsvpData } = templateData;
-
-  // Generate WhatsApp message based on template data
+  // Generate WhatsApp message based on event data
   const generateWhatsAppMessage = () => {
-    return `🎉 Habari ${invitationData.guestName}!
+    const sampleGuestName = currentEvent.guests.length > 0 ? currentEvent.guests[0].name : 'Guest';
+    
+    return `🎉 Habari ${sampleGuestName}!
 
-Tafadhali pokea mwaliko wa ${invitationData.coupleName.toUpperCase()}, Itakayofanyika ${invitationData.eventDate}, ${invitationData.venue.toUpperCase()}, SAA ${invitationData.eventTime}.
+Tafadhali pokea mwaliko wa ${currentEvent.title.toUpperCase()}, Itakayofanyika ${currentEvent.date}, ${currentEvent.venue.toUpperCase()}${currentEvent.time ? `, SAA ${currentEvent.time}` : ''}.
 
-${invitationData.reception ? `Followed by reception at ${invitationData.receptionTime}, ${invitationData.reception.toUpperCase()}` : ''}
+${currentEvent.reception ? `Followed by reception at ${currentEvent.receptionTime || 'TBD'}, ${currentEvent.reception.toUpperCase()}` : ''}
 
-${invitationData.theme ? `THEME: ${invitationData.theme.toUpperCase()}` : ''}
+${currentEvent.theme ? `THEME: ${currentEvent.theme.toUpperCase()}` : ''}
 
 Tafadhali bofya chaguo mojawapo hapo chini kuthibitisha ushiriki
 
 Karibu Sana!
 
-RSVP: ${invitationData.rsvpContact}
+RSVP: ${currentEvent.rsvpContact}
 Ujumbe huu, umetumwa kwa kupitia Alika`;
   };
 
@@ -149,7 +107,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
   };
 
   const goBackToEditor = () => {
-    navigate('/template/1', { state: { templateData } });
+    navigate(`/template/${currentEvent.id}`);
   };
 
   return (
@@ -168,7 +126,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-white">Message Preview</h1>
-            <p className="text-slate-300">Preview how guests will receive your invitation</p>
+            <p className="text-slate-300">Event: {currentEvent.title}</p>
           </div>
         </div>
 
@@ -178,20 +136,20 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <p className="text-slate-400 text-sm">Event</p>
-              <p className="text-white font-semibold">{invitationData.coupleName}</p>
+              <p className="text-white font-semibold">{currentEvent.title}</p>
             </div>
             <div>
               <p className="text-slate-400 text-sm">Date & Time</p>
-              <p className="text-white font-semibold">{invitationData.eventDate}</p>
-              <p className="text-slate-300 text-sm">{invitationData.eventTime}</p>
+              <p className="text-white font-semibold">{currentEvent.date}</p>
+              {currentEvent.time && <p className="text-slate-300 text-sm">{currentEvent.time}</p>}
             </div>
             <div>
               <p className="text-slate-400 text-sm">Venue</p>
-              <p className="text-white font-semibold">{invitationData.venue}</p>
+              <p className="text-white font-semibold">{currentEvent.venue}</p>
             </div>
             <div>
               <p className="text-slate-400 text-sm">Theme</p>
-              <p className="text-white font-semibold">{invitationData.theme}</p>
+              <p className="text-white font-semibold">{currentEvent.theme || 'Not specified'}</p>
             </div>
           </div>
         </Card>
@@ -224,10 +182,10 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                 <div className="space-y-4">
                   <div className="bg-slate-800 rounded-lg p-3 max-w-xs">
                     {/* Image in WhatsApp message */}
-                    {invitationData.invitationImage && (
+                    {currentEvent.invitationImage && (
                       <div className="mb-3">
                         <img
-                          src={invitationData.invitationImage}
+                          src={currentEvent.invitationImage}
                           alt="Invitation preview"
                           className="w-full h-32 object-cover rounded-lg"
                         />
@@ -249,7 +207,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                       } text-white`}
                     >
                       <CheckCircle className="w-3 h-3 mr-1" />
-                      {rsvpData.confirmText}
+                      {currentEvent.rsvpSettings.confirmText}
                     </Button>
                     <Button
                       size="sm"
@@ -261,7 +219,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                       } text-white`}
                     >
                       <XCircle className="w-3 h-3 mr-1" />
-                      {rsvpData.declineText}
+                      {currentEvent.rsvpSettings.declineText}
                     </Button>
                   </div>
                   
@@ -269,7 +227,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                     <div className="bg-slate-600 rounded-lg p-3 max-w-xs ml-auto">
                       <p className="text-white text-sm">
                         {selectedResponse === 'accept' 
-                          ? rsvpData.thankYouMessage 
+                          ? currentEvent.rsvpSettings.thankYouMessage 
                           : 'Thank you for letting us know. We\'ll miss you!'}
                       </p>
                       <p className="text-slate-400 text-xs mt-2">17:40 ✓✓</p>
@@ -308,30 +266,30 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
               <h2 className="text-xl font-bold text-white mb-6">RSVP Form Preview</h2>
               <p className="text-slate-300 mb-6">This is what guests see when they click the RSVP link</p>
               
-              {/* Dynamic RSVP Form using template data */}
+              {/* Dynamic RSVP Form using event data */}
               <div 
                 className="rounded-lg p-6 max-w-md mx-auto"
-                style={{ backgroundColor: rsvpData.backgroundColor }}
+                style={{ backgroundColor: currentEvent.rsvpSettings.backgroundColor }}
               >
                 <div className="text-center mb-6">
-                  <h3 className="text-2xl font-bold mb-2" style={{ color: rsvpData.textColor }}>
-                    {rsvpData.title}
+                  <h3 className="text-2xl font-bold mb-2" style={{ color: currentEvent.rsvpSettings.textColor }}>
+                    {currentEvent.rsvpSettings.title}
                   </h3>
-                  <p style={{ color: rsvpData.textColor }}>{rsvpData.subtitle}</p>
-                  <p className="text-sm opacity-75" style={{ color: rsvpData.textColor }}>
-                    {rsvpData.location}
+                  <p style={{ color: currentEvent.rsvpSettings.textColor }}>{currentEvent.rsvpSettings.subtitle}</p>
+                  <p className="text-sm opacity-75" style={{ color: currentEvent.rsvpSettings.textColor }}>
+                    {currentEvent.venue}
                   </p>
                 </div>
 
                 <div className="mb-6">
-                  <p className="text-center text-sm" style={{ color: rsvpData.textColor }}>
-                    {rsvpData.welcomeMessage}
+                  <p className="text-center text-sm" style={{ color: currentEvent.rsvpSettings.textColor }}>
+                    {currentEvent.rsvpSettings.welcomeMessage}
                   </p>
                 </div>
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block font-medium mb-2 text-sm" style={{ color: rsvpData.textColor }}>
+                    <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings.textColor }}>
                       Will you be attending?
                     </label>
                     <div className="grid grid-cols-1 gap-2">
@@ -340,13 +298,13 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                         size="sm"
                         className="flex items-center justify-center gap-2"
                         style={{ 
-                          borderColor: rsvpData.accentColor, 
-                          color: rsvpData.accentColor,
+                          borderColor: currentEvent.rsvpSettings.accentColor, 
+                          color: currentEvent.rsvpSettings.accentColor,
                           backgroundColor: 'transparent'
                         }}
                       >
                         <CheckCircle className="w-4 h-4" />
-                        {rsvpData.confirmText}
+                        {currentEvent.rsvpSettings.confirmText}
                       </Button>
                       <Button 
                         variant="outline" 
@@ -359,25 +317,25 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                         }}
                       >
                         <XCircle className="w-4 h-4" />
-                        {rsvpData.declineText}
+                        {currentEvent.rsvpSettings.declineText}
                       </Button>
                     </div>
                   </div>
                   
-                  {rsvpData.guestCountEnabled && (
+                  {currentEvent.rsvpSettings.guestCountEnabled && (
                     <div>
-                      <label className="block font-medium mb-2 text-sm" style={{ color: rsvpData.textColor }}>
-                        {rsvpData.guestCountLabel}
+                      <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings.textColor }}>
+                        {currentEvent.rsvpSettings.guestCountLabel}
                       </label>
                       <select 
                         className="w-full p-2 rounded-lg border text-sm"
                         style={{ 
-                          backgroundColor: rsvpData.backgroundColor,
-                          borderColor: rsvpData.accentColor,
-                          color: rsvpData.textColor
+                          backgroundColor: currentEvent.rsvpSettings.backgroundColor,
+                          borderColor: currentEvent.rsvpSettings.accentColor,
+                          color: currentEvent.rsvpSettings.textColor
                         }}
                       >
-                        {rsvpData.guestCountOptions.map((option, index) => (
+                        {currentEvent.rsvpSettings.guestCountOptions.map((option, index) => (
                           <option key={index} value={option}>{option}</option>
                         ))}
                       </select>
@@ -385,9 +343,9 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                   )}
 
                   {/* Render additional custom fields */}
-                  {rsvpData.additionalFields.map((field) => (
+                  {currentEvent.rsvpSettings.additionalFields.map((field) => (
                     <div key={field.id}>
-                      <label className="block font-medium mb-2 text-sm" style={{ color: rsvpData.textColor }}>
+                      <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings.textColor }}>
                         {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
                       </label>
                       {field.type === 'text' && (
@@ -395,9 +353,9 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                           type="text"
                           className="w-full p-2 rounded-lg border text-sm"
                           style={{ 
-                            backgroundColor: rsvpData.backgroundColor,
-                            borderColor: rsvpData.accentColor,
-                            color: rsvpData.textColor
+                            backgroundColor: currentEvent.rsvpSettings.backgroundColor,
+                            borderColor: currentEvent.rsvpSettings.accentColor,
+                            color: currentEvent.rsvpSettings.textColor
                           }}
                         />
                       )}
@@ -405,9 +363,9 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                         <textarea
                           className="w-full p-2 rounded-lg border h-16 text-sm"
                           style={{ 
-                            backgroundColor: rsvpData.backgroundColor,
-                            borderColor: rsvpData.accentColor,
-                            color: rsvpData.textColor
+                            backgroundColor: currentEvent.rsvpSettings.backgroundColor,
+                            borderColor: currentEvent.rsvpSettings.accentColor,
+                            color: currentEvent.rsvpSettings.textColor
                           }}
                         />
                       )}
@@ -415,9 +373,9 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                         <select
                           className="w-full p-2 rounded-lg border text-sm"
                           style={{ 
-                            backgroundColor: rsvpData.backgroundColor,
-                            borderColor: rsvpData.accentColor,
-                            color: rsvpData.textColor
+                            backgroundColor: currentEvent.rsvpSettings.backgroundColor,
+                            borderColor: currentEvent.rsvpSettings.accentColor,
+                            color: currentEvent.rsvpSettings.textColor
                           }}
                         >
                           <option>Select an option</option>
@@ -429,18 +387,18 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                     </div>
                   ))}
                   
-                  {rsvpData.specialRequestsEnabled && (
+                  {currentEvent.rsvpSettings.specialRequestsEnabled && (
                     <div>
-                      <label className="block font-medium mb-2 text-sm" style={{ color: rsvpData.textColor }}>
-                        {rsvpData.specialRequestsLabel}
+                      <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings.textColor }}>
+                        {currentEvent.rsvpSettings.specialRequestsLabel}
                       </label>
                       <textarea 
                         className="w-full p-2 rounded-lg border h-16 text-sm"
-                        placeholder={rsvpData.specialRequestsPlaceholder}
+                        placeholder={currentEvent.rsvpSettings.specialRequestsPlaceholder}
                         style={{ 
-                          backgroundColor: rsvpData.backgroundColor,
-                          borderColor: rsvpData.accentColor,
-                          color: rsvpData.textColor
+                          backgroundColor: currentEvent.rsvpSettings.backgroundColor,
+                          borderColor: currentEvent.rsvpSettings.accentColor,
+                          color: currentEvent.rsvpSettings.textColor
                         }}
                       />
                     </div>
@@ -449,11 +407,11 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                   <Button 
                     className="w-full py-2 font-semibold text-sm"
                     style={{ 
-                      backgroundColor: rsvpData.buttonColor,
+                      backgroundColor: currentEvent.rsvpSettings.buttonColor,
                       color: '#ffffff'
                     }}
                   >
-                    {rsvpData.submitButtonText}
+                    {currentEvent.rsvpSettings.submitButtonText}
                   </Button>
                 </div>
               </div>

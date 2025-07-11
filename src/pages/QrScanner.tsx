@@ -7,32 +7,22 @@ import { Badge } from '@/components/ui/badge';
 import { QrCode, Camera, Users, CheckCircle, X, Search, AlertCircle, CameraOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { getCurrentEvent, getGuests, checkInGuest, simulateQRScan, Guest } from '@/utils/storage';
 
 const QrScanner = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [checkedInGuests, setCheckedInGuests] = useState([]);
-  const [pendingGuests, setPendingGuests] = useState([]);
+  const [checkedInGuests, setCheckedInGuests] = useState<Guest[]>([]);
+  const [pendingGuests, setPendingGuests] = useState<Guest[]>([]);
   const [cameraError, setCameraError] = useState('');
   const [hasPermission, setHasPermission] = useState(false);
+  const [currentEvent, setCurrentEvent] = useState(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Load guests from localStorage
-    const savedGuests = JSON.parse(localStorage.getItem('guests') || '[]');
-    const checkedIn = savedGuests.filter(guest => guest.checkedIn);
-    const pending = savedGuests.filter(guest => !guest.checkedIn);
-    
-    setCheckedInGuests(checkedIn);
-    setPendingGuests(pending.length > 0 ? pending : [
-      { id: 1, name: "Emma Davis", email: "emma@email.com", table: "Table 2" },
-      { id: 2, name: "Tom Brown", email: "tom@email.com", table: "Table 8" },
-      { id: 3, name: "Lisa Anderson", email: "lisa@email.com", table: "Table 1" },
-      { id: 4, name: "David Miller", email: "david@email.com", table: "Table 4" },
-    ]);
-
+    loadEventData();
     return () => {
       // Cleanup camera stream on unmount
       if (streamRef.current) {
@@ -40,6 +30,26 @@ const QrScanner = () => {
       }
     };
   }, []);
+
+  const loadEventData = () => {
+    const event = getCurrentEvent();
+    if (!event) {
+      toast({
+        title: "No Event Selected",
+        description: "Please select an event from the dashboard first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setCurrentEvent(event);
+    const guests = getGuests(event.id);
+    const checkedIn = guests.filter(guest => guest.checkedIn);
+    const pending = guests.filter(guest => !guest.checkedIn);
+    
+    setCheckedInGuests(checkedIn);
+    setPendingGuests(pending);
+  };
 
   const requestCameraPermission = async () => {
     try {
@@ -68,6 +78,15 @@ const QrScanner = () => {
   };
 
   const startScanning = async () => {
+    if (!currentEvent) {
+      toast({
+        title: "No Event Selected",
+        description: "Please select an event first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!hasPermission) {
       const granted = await requestCameraPermission();
       if (!granted) return;
@@ -75,10 +94,9 @@ const QrScanner = () => {
     
     setIsScanning(true);
     
-    // In a real implementation, you would use a QR code scanning library here
-    // For demo purposes, we'll simulate scanning after 3 seconds
+    // Simulate scanning after 3 seconds for demo
     setTimeout(() => {
-      simulateQRScan();
+      handleQRScan();
     }, 3000);
   };
 
@@ -94,15 +112,16 @@ const QrScanner = () => {
     setHasPermission(false);
   };
 
-  const simulateQRScan = () => {
-    // Simulate finding a guest from QR code
-    if (pendingGuests.length > 0) {
-      const randomGuest = pendingGuests[Math.floor(Math.random() * pendingGuests.length)];
-      checkInGuest(randomGuest.id);
-      
+  const handleQRScan = () => {
+    if (!currentEvent) return;
+    
+    const scannedGuest = simulateQRScan(currentEvent.id);
+    
+    if (scannedGuest) {
+      loadEventData(); // Refresh data
       toast({
         title: "Guest Checked In!",
-        description: `${randomGuest.name} has been successfully checked in.`,
+        description: `${scannedGuest.name} has been successfully checked in.`,
       });
     } else {
       toast({
@@ -116,36 +135,41 @@ const QrScanner = () => {
     stopScanning();
   };
 
-  const checkInGuest = (guestId: number) => {
-    const guest = pendingGuests.find(g => g.id === guestId);
-    if (!guest) return;
-
-    const updatedGuest = {
-      ...guest,
-      checkedIn: true,
-      checkInTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    const newCheckedInGuests = [...checkedInGuests, updatedGuest];
-    const newPendingGuests = pendingGuests.filter(g => g.id !== guestId);
-
-    setCheckedInGuests(newCheckedInGuests);
-    setPendingGuests(newPendingGuests);
-
-    // Save to localStorage
-    const allGuests = [...newCheckedInGuests, ...newPendingGuests];
-    localStorage.setItem('guests', JSON.stringify(allGuests));
-
-    toast({
-      title: "Guest Checked In",
-      description: `${guest.name} has been checked in successfully!`,
-    });
+  const handleManualCheckIn = (guestId: string) => {
+    if (!currentEvent) return;
+    
+    const success = checkInGuest(currentEvent.id, guestId);
+    if (success) {
+      loadEventData(); // Refresh data
+      const guest = pendingGuests.find(g => g.id === guestId);
+      toast({
+        title: "Guest Checked In",
+        description: `${guest?.name} has been checked in successfully!`,
+      });
+    }
   };
 
   const filteredPendingGuests = pendingGuests.filter(guest =>
     guest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     guest.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (!currentEvent) {
+    return (
+      <div className="min-h-screen bg-slate-900">
+        <Header />
+        <div className="container mx-auto px-4 py-8 pt-24">
+          <Card className="bg-slate-800 border-slate-700">
+            <CardContent className="text-center py-12">
+              <AlertCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-slate-400 mb-2">No Event Selected</h3>
+              <p className="text-slate-500">Please select an event from the dashboard to use the QR scanner.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -154,7 +178,7 @@ const QrScanner = () => {
       <div className="container mx-auto px-4 py-8 pt-24">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">QR Scanner & Check-in</h1>
-          <p className="text-slate-300">Scan QR codes or manually check in guests</p>
+          <p className="text-slate-300">Event: {currentEvent.title}</p>
         </div>
 
         {/* Stats Overview */}
@@ -286,7 +310,7 @@ const QrScanner = () => {
                       <div>
                         <p className="font-medium text-white">{guest.name}</p>
                         <p className="text-sm text-slate-300">{guest.email}</p>
-                        <p className="text-xs text-slate-400">{guest.table}</p>
+                        {guest.table && <p className="text-xs text-slate-400">{guest.table}</p>}
                       </div>
                       <div className="text-right">
                         <Badge className="bg-green-600 mb-1">
@@ -333,13 +357,13 @@ const QrScanner = () => {
                       <div>
                         <p className="font-medium text-white">{guest.name}</p>
                         <p className="text-sm text-slate-300">{guest.email}</p>
-                        <p className="text-xs text-slate-400">{guest.table}</p>
+                        {guest.table && <p className="text-xs text-slate-400">{guest.table}</p>}
                       </div>
                       <div className="flex items-center gap-2">
                         <Button 
                           size="sm" 
                           className="bg-green-600 hover:bg-green-700"
-                          onClick={() => checkInGuest(guest.id)}
+                          onClick={() => handleManualCheckIn(guest.id)}
                         >
                           <CheckCircle className="w-4 h-4" />
                         </Button>

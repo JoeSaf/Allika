@@ -4,12 +4,15 @@ import Header from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Users, MessageSquare, BarChart3, QrCode, Plus } from 'lucide-react';
+import { Calendar, Users, MessageSquare, BarChart3, QrCode, Plus, Eye, Trash2, Edit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getEvents, deleteEvent, setCurrentEvent, Event } from '@/utils/storage';
+import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [events, setEvents] = useState([]);
+  const { toast } = useToast();
+  const [events, setEvents] = useState<Event[]>([]);
   const [stats, setStats] = useState({
     totalEvents: 0,
     totalGuests: 0,
@@ -18,14 +21,16 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    // In a real app, this would fetch from an API or database
-    // For now, we'll check localStorage for any saved events
-    const savedEvents = JSON.parse(localStorage.getItem('events') || '[]');
+    loadEvents();
+  }, []);
+
+  const loadEvents = () => {
+    const savedEvents = getEvents();
     setEvents(savedEvents);
     
-    // Calculate stats from saved events
-    const totalGuests = savedEvents.reduce((sum, event) => sum + (event.guests || 0), 0);
-    const invitationsSent = savedEvents.reduce((sum, event) => sum + (event.sent || 0), 0);
+    // Calculate stats
+    const totalGuests = savedEvents.reduce((sum, event) => sum + event.guests.length, 0);
+    const invitationsSent = savedEvents.reduce((sum, event) => sum + event.messagesSent, 0);
     const activeEvents = savedEvents.filter(event => event.status === 'active').length;
     
     setStats({
@@ -34,7 +39,31 @@ const Dashboard = () => {
       invitationsSent,
       activeEvents
     });
-  }, []);
+  };
+
+  const handleDeleteEvent = (eventId: string) => {
+    deleteEvent(eventId);
+    loadEvents();
+    toast({
+      title: "Event Deleted",
+      description: "The event has been successfully deleted.",
+    });
+  };
+
+  const handleEditEvent = (eventId: string) => {
+    setCurrentEvent(eventId);
+    navigate(`/template/${eventId}`);
+  };
+
+  const handleViewAnalytics = (eventId: string) => {
+    setCurrentEvent(eventId);
+    navigate('/view-analytics');
+  };
+
+  const handleQRScanner = (eventId: string) => {
+    setCurrentEvent(eventId);
+    navigate('/qr-scanner');
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -132,8 +161,9 @@ const Dashboard = () => {
                   <div key={event.id} className="flex items-center justify-between p-4 bg-slate-700 rounded-lg">
                     <div className="flex items-center space-x-4">
                       <div>
-                        <h3 className="font-semibold text-white">{event.title}</h3>
-                        <p className="text-sm text-slate-300">{event.date}</p>
+                        <h3 className="font-semibold text-white">{event.title || 'Untitled Event'}</h3>
+                        <p className="text-sm text-slate-300">{event.date} {event.time && `at ${event.time}`}</p>
+                        <p className="text-xs text-slate-400">{event.venue}</p>
                       </div>
                     </div>
                     
@@ -145,14 +175,22 @@ const Dashboard = () => {
                         {event.status}
                       </Badge>
                       <span className="text-sm text-slate-300">
-                        {event.sent || 0}/{event.guests || 0} sent
+                        {event.messagesSent}/{event.guests.length} sent
                       </span>
                       
                       <div className="flex space-x-2">
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => navigate('/view-analytics')}
+                          onClick={() => handleEditEvent(event.id)}
+                          className="border-slate-600 text-slate-300 hover:bg-slate-600"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleViewAnalytics(event.id)}
                           className="border-slate-600 text-slate-300 hover:bg-slate-600"
                         >
                           <BarChart3 className="w-4 h-4" />
@@ -160,10 +198,18 @@ const Dashboard = () => {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => navigate('/qr-scanner')}
+                          onClick={() => handleQRScanner(event.id)}
                           className="border-slate-600 text-slate-300 hover:bg-slate-600"
                         >
                           <QrCode className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleDeleteEvent(event.id)}
+                          className="border-red-600 text-red-300 hover:bg-red-900"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </div>

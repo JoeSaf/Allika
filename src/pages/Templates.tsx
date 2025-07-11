@@ -1,154 +1,86 @@
+
 import { useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Filter, Eye, Heart, Grid, List } from 'lucide-react';
 import Header from '@/components/Header';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Heart, Gift, Sparkles, ArrowLeft } from 'lucide-react';
+import { createDefaultEvent, saveEvent, setCurrentEvent } from '@/utils/storage';
 
 const Templates = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category');
-  
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(category || 'all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const templates = [
     {
-      id: 1,
-      name: 'Elegant Wedding Invitation',
+      id: 'wedding-1',
+      name: 'Elegant Wedding',
+      type: 'wedding',
       category: 'weddings',
-      image: 'https://images.unsplash.com/photo-1606800052052-a08af7148866?w=400',
-      price: '2,600',
-      description: 'Beautiful wedding invitation with picture on left, text on top right',
-      layout: 'layout1'
+      description: 'Classic and elegant wedding invitation with floral elements',
+      image: '/placeholder.svg',
+      icon: Heart,
+      color: 'from-pink-500 to-rose-500',
+      tags: ['Classic', 'Elegant', 'Floral']
     },
     {
-      id: 2,
-      name: 'Modern Event Invitation',
-      category: 'birthday',
-      image: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=400',
-      price: '2,200',
-      description: 'Contemporary design with picture on left, text below',
-      layout: 'layout2'
+      id: 'party-1',
+      name: 'Birthday Celebration',
+      type: 'birthday',
+      category: 'parties',
+      description: 'Fun and colorful birthday party invitation',
+      image: '/placeholder.svg',
+      icon: Gift,
+      color: 'from-blue-500 to-purple-500',
+      tags: ['Fun', 'Colorful', 'Celebration']
     },
     {
-      id: 3,
-      name: 'Classic Celebration Card',
-      category: 'kitchen party',
-      image: 'https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=400',
-      price: '2,200',
-      description: 'Sophisticated design with picture on right, text on left',
-      layout: 'layout3'
+      id: 'corporate-1',
+      name: 'Awards Ceremony',
+      type: 'awards',
+      category: 'awards',
+      description: 'Professional awards ceremony invitation',
+      image: '/placeholder.svg',
+      icon: Sparkles,
+      color: 'from-amber-500 to-orange-500',
+      tags: ['Professional', 'Formal', 'Awards']
     }
   ];
 
-  const categories = [
-    { id: 'all', name: 'All Templates' },
-    { id: 'weddings', name: 'Weddings' },
-    { id: 'kitchen party', name: 'Kitchen Party' },
-    { id: 'birthday', name: 'Birthday' },
-    { id: 'sendoff', name: 'Send Off' },
-    { id: 'welcome', name: 'Welcome' }
-  ];
+  const filteredTemplates = category 
+    ? templates.filter(template => template.category === category)
+    : templates;
 
-  const filteredTemplates = templates.filter(template => {
-    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
-  const TemplatePreview = ({ template }: { template: any }) => {
-    const { layout, name, category, image } = template;
+  const handleSelectTemplate = (template: any) => {
+    // Create a new event based on the template
+    const newEvent = createDefaultEvent(template.type);
+    newEvent.title = `New ${template.name}`;
     
-    const commonContent = {
-      eventName: name.split(' ')[0] + ' ' + name.split(' ')[1],
-      date: "December 25, 2024",
-      time: "6:00 PM",
-      venue: "Grand Ballroom",
-      details: "Join us for a memorable celebration"
-    };
-
-    if (layout === 'layout1') {
-      // Picture on left, text on top right
-      return (
-        <div className="bg-gradient-to-br from-purple-100 to-pink-100 p-6 h-64 flex">
-          <div className="w-1/2 pr-4">
-            <img src={image} alt={name} className="w-full h-full object-cover rounded-lg shadow-md" />
-          </div>
-          <div className="w-1/2 pl-4 flex flex-col justify-center">
-            <div className="text-center space-y-3">
-              <h3 className="text-lg font-bold text-purple-800 uppercase tracking-wide">{commonContent.eventName}</h3>
-              <div className="space-y-1 text-sm text-purple-700">
-                <p className="font-semibold">{commonContent.date}</p>
-                <p>{commonContent.time}</p>
-                <p className="font-medium">{commonContent.venue}</p>
-              </div>
-              <p className="text-xs text-purple-600 italic mt-3">{commonContent.details}</p>
-            </div>
-          </div>
-        </div>
-      );
+    // Customize RSVP settings based on template type
+    if (template.type === 'wedding') {
+      newEvent.rsvpSettings.title = 'Wedding Invitation';
+      newEvent.rsvpSettings.subtitle = 'Join us in celebration of our special day';
+      newEvent.rsvpSettings.welcomeMessage = 'We would be honored by your presence at our wedding';
+    } else if (template.type === 'birthday') {
+      newEvent.rsvpSettings.title = 'Birthday Party';
+      newEvent.rsvpSettings.subtitle = 'Come celebrate with us!';
+      newEvent.rsvpSettings.welcomeMessage = 'Join us for an amazing birthday celebration';
+    } else if (template.type === 'awards') {
+      newEvent.rsvpSettings.title = 'Awards Ceremony';
+      newEvent.rsvpSettings.subtitle = 'An evening of recognition and celebration';
+      newEvent.rsvpSettings.welcomeMessage = 'You are cordially invited to our awards ceremony';
+      newEvent.rsvpSettings.guestCountEnabled = false;
+      newEvent.rsvpSettings.specialRequestsEnabled = false;
     }
     
-    if (layout === 'layout2') {
-      // Picture on left, text below
-      return (
-        <div className="bg-gradient-to-b from-blue-50 to-teal-100 p-6 h-64 flex flex-col">
-          <div className="flex flex-1 mb-4">
-            <div className="w-1/2 pr-3">
-              <img src={image} alt={name} className="w-full h-full object-cover rounded-lg shadow-md" />
-            </div>
-            <div className="w-1/2 pl-3 flex items-center">
-              <div className="text-center w-full">
-                <h3 className="text-xl font-bold text-teal-800 mb-2">{commonContent.eventName}</h3>
-                <div className="text-sm text-teal-700 space-y-1">
-                  <p className="font-semibold">{commonContent.date}</p>
-                  <p>{commonContent.time}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-teal-200 pt-3 text-center">
-            <p className="text-sm font-medium text-teal-800">{commonContent.venue}</p>
-            <p className="text-xs text-teal-600 mt-1">{commonContent.details}</p>
-          </div>
-        </div>
-      );
-    }
+    // Save the event and set it as current
+    saveEvent(newEvent);
+    setCurrentEvent(newEvent.id);
     
-    if (layout === 'layout3') {
-      // Picture on right, text on left
-      return (
-        <div className="bg-gradient-to-br from-amber-50 to-orange-100 p-6 h-64 flex">
-          <div className="w-1/2 pr-4 flex flex-col justify-center">
-            <div className="space-y-4">
-              <h3 className="text-xl font-bold text-amber-800 text-center">{commonContent.eventName}</h3>
-              <div className="space-y-2 text-sm text-amber-700 text-center">
-                <p className="font-semibold text-base">{commonContent.date}</p>
-                <p className="font-medium">{commonContent.time}</p>
-                <p className="font-medium">{commonContent.venue}</p>
-              </div>
-              <div className="border-t border-amber-200 pt-3">
-                <p className="text-xs text-amber-600 text-center italic">{commonContent.details}</p>
-              </div>
-            </div>
-          </div>
-          <div className="w-1/2 pl-4">
-            <img src={image} alt={name} className="w-full h-full object-cover rounded-lg shadow-md" />
-          </div>
-        </div>
-      );
-    }
-
-    // Fallback layout
-    return (
-      <div className="bg-gray-100 p-6 h-64 flex items-center justify-center">
-        <p className="text-gray-500">Template Preview</p>
-      </div>
-    );
+    // Navigate to template editor
+    navigate(`/template/${newEvent.id}`);
   };
 
   return (
@@ -156,117 +88,69 @@ const Templates = () => {
       <Header />
       
       <div className="container mx-auto px-4 py-8 pt-24">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Template Library</h1>
-          <p className="text-slate-300">Choose from our collection of stunning invitation templates</p>
-        </div>
-
-        {/* Search and Filters */}
-        <Card className="bg-slate-800 border-slate-700 p-6 mb-8">
-          <div className="flex flex-col lg:flex-row gap-4 items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <Input
-                placeholder="Search templates..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white pl-10"
-              />
-            </div>
-            
-            <div className="flex gap-2">
-              {categories.map(cat => (
-                <Button
-                  key={cat.id}
-                  variant={selectedCategory === cat.id ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={selectedCategory === cat.id 
-                    ? "bg-teal-600 hover:bg-teal-700" 
-                    : "border-slate-600 text-slate-300 hover:bg-slate-700"
-                  }
-                >
-                  {cat.name}
-                </Button>
-              ))}
-            </div>
-            
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setViewMode('grid')}
-                className={`border-slate-600 ${viewMode === 'grid' ? 'bg-slate-700' : ''}`}
-              >
-                <Grid className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setViewMode('list')}
-                className={`border-slate-600 ${viewMode === 'list' ? 'bg-slate-700' : ''}`}
-              >
-                <List className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </Card>
-
-        {/* Templates Grid */}
-        <div className={`grid gap-6 ${
-          viewMode === 'grid' 
-            ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' 
-            : 'grid-cols-1'
-        }`}>
-          {filteredTemplates.map((template) => (
-            <Card 
-              key={template.id} 
-              className={`bg-slate-800 border-slate-700 overflow-hidden group hover:shadow-xl transition-all duration-300 hover:scale-105 ${
-                viewMode === 'list' ? 'flex flex-col' : ''
-              }`}
+        <div className="flex items-center gap-4 mb-8">
+          {category && (
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/templates')}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
             >
-              <div className="relative">
-                <TemplatePreview template={template} />
-                <div className="absolute top-2 left-2">
-                  <span className="bg-slate-900/80 text-white px-2 py-1 rounded text-xs font-medium backdrop-blur-sm capitalize">
-                    {template.category}
-                  </span>
-                </div>
-                <div className="absolute top-2 right-2 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <Button size="sm" variant="secondary" className="h-8 w-8 p-0">
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                  <Button size="sm" variant="secondary" className="h-8 w-8 p-0">
-                    <Heart className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              <div className={`p-4 ${viewMode === 'list' ? 'flex-1 flex flex-col justify-between' : ''}`}>
-                <div>
-                  <h3 className="text-white font-semibold mb-2">{template.name}</h3>
-                  {viewMode === 'list' && (
-                    <p className="text-slate-300 text-sm mb-4">{template.description}</p>
-                  )}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-teal-400 font-bold">{template.price} Tsh</span>
-                  <Button 
-                    size="sm" 
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => navigate(`/template/${template.id}`)}
-                  >
-                    Use Template
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              All Templates
+            </Button>
+          )}
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">
+              {category ? `${category.charAt(0).toUpperCase() + category.slice(1)} Templates` : 'Choose a Template'}
+            </h1>
+            <p className="text-slate-300">Select a template to start creating your invitation</p>
+          </div>
         </div>
 
-        {filteredTemplates.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-slate-400 text-lg">No templates found matching your criteria.</p>
+        {filteredTemplates.length === 0 ? (
+          <Card className="bg-slate-800 border-slate-700">
+            <CardContent className="text-center py-12">
+              <h3 className="text-xl font-semibold text-slate-400 mb-2">No templates found</h3>
+              <p className="text-slate-500 mb-6">No templates available for this category</p>
+              <Button 
+                onClick={() => navigate('/templates')}
+                className="bg-teal-600 hover:bg-teal-700"
+              >
+                View All Templates
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredTemplates.map((template) => {
+              const IconComponent = template.icon;
+              return (
+                <Card key={template.id} className="bg-slate-800 border-slate-700 hover:border-slate-600 transition-all cursor-pointer">
+                  <CardHeader>
+                    <div className={`w-full h-40 bg-gradient-to-br ${template.color} rounded-lg flex items-center justify-center mb-4`}>
+                      <IconComponent className="w-16 h-16 text-white" />
+                    </div>
+                    <CardTitle className="text-white">{template.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-slate-300 text-sm mb-4">{template.description}</p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {template.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="bg-slate-700 text-slate-300">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                    <Button 
+                      onClick={() => handleSelectTemplate(template)}
+                      className="w-full bg-teal-600 hover:bg-teal-700"
+                    >
+                      Use This Template
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
