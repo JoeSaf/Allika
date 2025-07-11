@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,35 +9,32 @@ import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [events] = useState([
-    {
-      id: 1,
-      title: "Sarah & John's Wedding",
-      date: "2024-08-15",
-      guests: 150,
-      sent: 145,
-      status: "active",
-      type: "Wedding"
-    },
-    {
-      id: 2,
-      title: "Birthday Celebration",
-      date: "2024-07-20",
-      guests: 50,
-      sent: 48,
-      status: "draft",
-      type: "Birthday"
-    },
-    {
-      id: 3,
-      title: "Corporate Gala",
-      date: "2024-09-10",
-      guests: 200,
-      sent: 200,
-      status: "completed",
-      type: "Corporate"
-    }
-  ]);
+  const [events, setEvents] = useState([]);
+  const [stats, setStats] = useState({
+    totalEvents: 0,
+    totalGuests: 0,
+    invitationsSent: 0,
+    activeEvents: 0
+  });
+
+  useEffect(() => {
+    // In a real app, this would fetch from an API or database
+    // For now, we'll check localStorage for any saved events
+    const savedEvents = JSON.parse(localStorage.getItem('events') || '[]');
+    setEvents(savedEvents);
+    
+    // Calculate stats from saved events
+    const totalGuests = savedEvents.reduce((sum, event) => sum + (event.guests || 0), 0);
+    const invitationsSent = savedEvents.reduce((sum, event) => sum + (event.sent || 0), 0);
+    const activeEvents = savedEvents.filter(event => event.status === 'active').length;
+    
+    setStats({
+      totalEvents: savedEvents.length,
+      totalGuests,
+      invitationsSent,
+      activeEvents
+    });
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -75,7 +72,7 @@ const Dashboard = () => {
               <Calendar className="h-4 w-4 text-teal-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">{events.length}</div>
+              <div className="text-2xl font-bold text-white">{stats.totalEvents}</div>
             </CardContent>
           </Card>
           
@@ -85,9 +82,7 @@ const Dashboard = () => {
               <Users className="h-4 w-4 text-teal-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">
-                {events.reduce((sum, event) => sum + event.guests, 0)}
-              </div>
+              <div className="text-2xl font-bold text-white">{stats.totalGuests}</div>
             </CardContent>
           </Card>
           
@@ -97,9 +92,7 @@ const Dashboard = () => {
               <MessageSquare className="h-4 w-4 text-teal-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">
-                {events.reduce((sum, event) => sum + event.sent, 0)}
-              </div>
+              <div className="text-2xl font-bold text-white">{stats.invitationsSent}</div>
             </CardContent>
           </Card>
           
@@ -109,9 +102,7 @@ const Dashboard = () => {
               <BarChart3 className="h-4 w-4 text-teal-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">
-                {events.filter(event => event.status === 'active').length}
-              </div>
+              <div className="text-2xl font-bold text-white">{stats.activeEvents}</div>
             </CardContent>
           </Card>
         </div>
@@ -122,49 +113,64 @@ const Dashboard = () => {
             <CardTitle className="text-white">Recent Events</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {events.map((event) => (
-                <div key={event.id} className="flex items-center justify-between p-4 bg-slate-700 rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <div>
-                      <h3 className="font-semibold text-white">{event.title}</h3>
-                      <p className="text-sm text-slate-300">{event.date}</p>
+            {events.length === 0 ? (
+              <div className="text-center py-12">
+                <Calendar className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-slate-400 mb-2">No events yet</h3>
+                <p className="text-slate-500 mb-6">Get started by creating your first event</p>
+                <Button 
+                  onClick={() => navigate('/templates')}
+                  className="bg-teal-600 hover:bg-teal-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Your First Event
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {events.map((event) => (
+                  <div key={event.id} className="flex items-center justify-between p-4 bg-slate-700 rounded-lg">
+                    <div className="flex items-center space-x-4">
+                      <div>
+                        <h3 className="font-semibold text-white">{event.title}</h3>
+                        <p className="text-sm text-slate-300">{event.date}</p>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    <Badge variant="secondary" className="bg-slate-600 text-white">
-                      {event.type}
-                    </Badge>
-                    <Badge className={getStatusColor(event.status)}>
-                      {event.status}
-                    </Badge>
-                    <span className="text-sm text-slate-300">
-                      {event.sent}/{event.guests} sent
-                    </span>
                     
-                    <div className="flex space-x-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => navigate('/view-analytics')}
-                        className="border-slate-600 text-slate-300 hover:bg-slate-600"
-                      >
-                        <BarChart3 className="w-4 h-4" />
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => navigate('/qr-scanner')}
-                        className="border-slate-600 text-slate-300 hover:bg-slate-600"
-                      >
-                        <QrCode className="w-4 h-4" />
-                      </Button>
+                    <div className="flex items-center space-x-4">
+                      <Badge variant="secondary" className="bg-slate-600 text-white">
+                        {event.type}
+                      </Badge>
+                      <Badge className={getStatusColor(event.status)}>
+                        {event.status}
+                      </Badge>
+                      <span className="text-sm text-slate-300">
+                        {event.sent || 0}/{event.guests || 0} sent
+                      </span>
+                      
+                      <div className="flex space-x-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => navigate('/view-analytics')}
+                          className="border-slate-600 text-slate-300 hover:bg-slate-600"
+                        >
+                          <BarChart3 className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => navigate('/qr-scanner')}
+                          className="border-slate-600 text-slate-300 hover:bg-slate-600"
+                        >
+                          <QrCode className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
