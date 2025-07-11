@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,56 +18,29 @@ const Templates = () => {
   const templates = [
     {
       id: 1,
-      name: 'Royal Islamic Wedding Invitation',
+      name: 'Elegant Wedding Invitation',
       category: 'weddings',
       image: 'https://images.unsplash.com/photo-1606800052052-a08af7148866?w=400',
       price: '2,600',
-      description: 'Elegant Islamic wedding invitation with traditional patterns',
+      description: 'Beautiful wedding invitation with picture on left, text on top right',
       layout: 'layout1'
     },
     {
       id: 2,
-      name: 'Hot Pink Kitchen Party',
-      category: 'kitchen party',
+      name: 'Modern Event Invitation',
+      category: 'birthday',
       image: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=400',
       price: '2,200',
-      description: 'Vibrant and fun kitchen party invitation design',
+      description: 'Contemporary design with picture on left, text below',
       layout: 'layout2'
     },
     {
       id: 3,
-      name: 'Black & Gold Wedding',
-      category: 'weddings',
+      name: 'Classic Celebration Card',
+      category: 'kitchen party',
       image: 'https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=400',
       price: '2,200',
-      description: 'Sophisticated black and gold wedding invitation',
-      layout: 'layout3'
-    },
-    {
-      id: 4,
-      name: 'White & Pink Bridal Shower',
-      category: 'kitchen party',
-      image: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=400',
-      price: '2,200',
-      description: 'Delicate bridal shower invitation in soft colors',
-      layout: 'layout1'
-    },
-    {
-      id: 5,
-      name: 'Purple Lavender Wedding',
-      category: 'weddings',
-      image: 'https://images.unsplash.com/photo-1469371670807-013ccf25f16a?w=400',
-      price: '2,200',
-      description: 'Romantic purple themed wedding invitation',
-      layout: 'layout2'
-    },
-    {
-      id: 6,
-      name: 'Modern Birthday Celebration',
-      category: 'birthday',
-      image: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400',
-      price: '1,800',
-      description: 'Contemporary birthday party invitation design',
+      description: 'Sophisticated design with picture on right, text on left',
       layout: 'layout3'
     }
   ];
