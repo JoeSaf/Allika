@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -19,8 +18,12 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
   const [formData, setFormData] = useState({
     name: '',
     type: 'wedding',
-    description: ''
+    description: '',
+    venue: '',
+    date: '',
+    time: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const eventTypes = [
     { value: 'wedding', label: 'Wedding' },
@@ -28,7 +31,11 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
     { value: 'anniversary', label: 'Anniversary' },
     { value: 'graduation', label: 'Graduation' },
     { value: 'corporate', label: 'Corporate Event' },
+    { value: 'conference', label: 'Conference' },
     { value: 'awards', label: 'Awards Ceremony' },
+    { value: 'festival', label: 'Festival' },
+    { value: 'meeting', label: 'Meeting' },
+    { value: 'seminar', label: 'Seminar' },
     { value: 'other', label: 'Other' }
   ];
 
@@ -47,7 +54,18 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      type: 'wedding',
+      description: '',
+      venue: '',
+      date: '',
+      time: ''
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name.trim()) {
@@ -59,85 +77,119 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
       return;
     }
 
-    // Create new event with proper naming
-    const newEvent = createDefaultEvent(formData.type);
-    newEvent.title = formData.name.trim();
-    newEvent.additionalInfo = formData.description;
-    
-    // Customize RSVP settings based on event type
-    switch (formData.type) {
-      case 'wedding':
-        newEvent.rsvpSettings.title = 'Wedding Invitation';
-        newEvent.rsvpSettings.subtitle = 'Join us in celebration of our special day';
-        newEvent.rsvpSettings.welcomeMessage = 'We would be honored by your presence at our wedding';
-        break;
-      case 'birthday':
-        newEvent.rsvpSettings.title = 'Birthday Party';
-        newEvent.rsvpSettings.subtitle = 'Come celebrate with us!';
-        newEvent.rsvpSettings.welcomeMessage = 'Join us for an amazing birthday celebration';
-        break;
-      case 'anniversary':
-        newEvent.rsvpSettings.title = 'Anniversary Celebration';
-        newEvent.rsvpSettings.subtitle = 'Celebrating years of love and happiness';
-        newEvent.rsvpSettings.welcomeMessage = 'Join us as we celebrate this special milestone';
-        break;
-      case 'graduation':
-        newEvent.rsvpSettings.title = 'Graduation Ceremony';
-        newEvent.rsvpSettings.subtitle = 'Celebrating academic achievement';
-        newEvent.rsvpSettings.welcomeMessage = 'Join us in celebrating this academic milestone';
-        break;
-      case 'corporate':
-        newEvent.rsvpSettings.title = 'Corporate Event';
-        newEvent.rsvpSettings.subtitle = 'Professional gathering';
-        newEvent.rsvpSettings.welcomeMessage = 'You are invited to our corporate event';
-        newEvent.rsvpSettings.guestCountEnabled = false;
-        break;
-      case 'awards':
-        newEvent.rsvpSettings.title = 'Awards Ceremony';
-        newEvent.rsvpSettings.subtitle = 'An evening of recognition and celebration';
-        newEvent.rsvpSettings.welcomeMessage = 'You are cordially invited to our awards ceremony';
-        newEvent.rsvpSettings.guestCountEnabled = false;
-        newEvent.rsvpSettings.specialRequestsEnabled = false;
-        break;
-      default:
-        newEvent.rsvpSettings.title = formData.name;
-        newEvent.rsvpSettings.subtitle = 'Join us for this special event';
-        newEvent.rsvpSettings.welcomeMessage = 'We would be delighted to have you join us';
+    setIsSubmitting(true);
+
+    try {
+      // Create new event with proper data
+      const newEvent = createDefaultEvent(formData.type);
+      newEvent.title = formData.name.trim();
+      newEvent.additionalInfo = formData.description;
+      newEvent.venue = formData.venue;
+      newEvent.date = formData.date;
+      newEvent.time = formData.time;
+      
+      // Customize RSVP settings based on event type
+      switch (formData.type) {
+        case 'wedding':
+          newEvent.rsvpSettings.title = `${formData.name} - Wedding Invitation`;
+          newEvent.rsvpSettings.subtitle = 'Join us in celebration of our special day';
+          newEvent.rsvpSettings.welcomeMessage = 'We would be honored by your presence at our wedding';
+          break;
+        case 'birthday':
+          newEvent.rsvpSettings.title = `${formData.name} - Birthday Party`;
+          newEvent.rsvpSettings.subtitle = 'Come celebrate with us!';
+          newEvent.rsvpSettings.welcomeMessage = 'Join us for an amazing birthday celebration';
+          break;
+        case 'anniversary':
+          newEvent.rsvpSettings.title = `${formData.name} - Anniversary Celebration`;
+          newEvent.rsvpSettings.subtitle = 'Celebrating years of love and happiness';
+          newEvent.rsvpSettings.welcomeMessage = 'Join us as we celebrate this special milestone';
+          break;
+        case 'graduation':
+          newEvent.rsvpSettings.title = `${formData.name} - Graduation Ceremony`;
+          newEvent.rsvpSettings.subtitle = 'Celebrating academic achievement';
+          newEvent.rsvpSettings.welcomeMessage = 'Join us in celebrating this academic milestone';
+          break;
+        case 'corporate':
+        case 'conference':
+        case 'meeting':
+        case 'seminar':
+          newEvent.rsvpSettings.title = formData.name;
+          newEvent.rsvpSettings.subtitle = 'Professional gathering';
+          newEvent.rsvpSettings.welcomeMessage = `You are invited to ${formData.name}`;
+          newEvent.rsvpSettings.guestCountEnabled = false;
+          break;
+        case 'awards':
+          newEvent.rsvpSettings.title = `${formData.name} - Awards Ceremony`;
+          newEvent.rsvpSettings.subtitle = 'An evening of recognition and celebration';
+          newEvent.rsvpSettings.welcomeMessage = 'You are cordially invited to our awards ceremony';
+          newEvent.rsvpSettings.guestCountEnabled = false;
+          newEvent.rsvpSettings.specialRequestsEnabled = false;
+          break;
+        case 'festival':
+          newEvent.rsvpSettings.title = `${formData.name} - Festival`;
+          newEvent.rsvpSettings.subtitle = 'Join us for a celebration';
+          newEvent.rsvpSettings.welcomeMessage = 'Come and enjoy the festivities with us';
+          break;
+        default:
+          newEvent.rsvpSettings.title = formData.name;
+          newEvent.rsvpSettings.subtitle = 'Join us for this special event';
+          newEvent.rsvpSettings.welcomeMessage = 'We would be delighted to have you join us';
+      }
+      
+      // Set location in RSVP settings
+      if (formData.venue) {
+        newEvent.rsvpSettings.location = formData.venue;
+      }
+      
+      // Save the event and set it as current
+      console.log('Saving new event:', newEvent);
+      saveEvent(newEvent);
+      setCurrentEvent(newEvent.id);
+      
+      toast({
+        title: "Event Created!",
+        description: `Your ${formData.type} event "${formData.name}" has been created successfully.`,
+      });
+      
+      // Reset form and close modal
+      resetForm();
+      onOpenChange(false);
+      
+      // Small delay to ensure state updates
+      setTimeout(() => {
+        navigate(`/template/${newEvent.id}`);
+      }, 100);
+      
+    } catch (error) {
+      console.error('Error creating event:', error);
+      toast({
+        title: "Error Creating Event",
+        description: "There was a problem creating your event. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    // Save the event and set it as current
-    saveEvent(newEvent);
-    setCurrentEvent(newEvent.id);
-    
-    // Store event data in JSON format
-    const eventData = {
-      ...newEvent,
-      createdBy: JSON.parse(localStorage.getItem('alika_user') || '{}'),
-      creationTimestamp: new Date().toISOString()
-    };
-    
-    console.log('Event created:', JSON.stringify(eventData, null, 2));
-    
-    toast({
-      title: "Event Created!",
-      description: `Your ${formData.type} event "${formData.name}" has been created successfully.`,
-    });
-    
-    // Close modal and navigate to template editor
-    onOpenChange(false);
-    navigate(`/template/${newEvent.id}`);
+  };
+
+  const handleClose = () => {
+    if (!isSubmitting) {
+      resetForm();
+      onOpenChange(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-800 border-slate-700 text-white">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-white">Create New Event</DialogTitle>
+          <DialogTitle className="text-white text-xl">Create New Event</DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <FormItem>
-            <FormLabel className="text-slate-300">Event Name</FormLabel>
+            <FormLabel className="text-slate-300">Event Name *</FormLabel>
             <FormControl>
               <Input
                 name="name"
@@ -147,20 +199,21 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
                 onChange={handleInputChange}
                 className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
                 required
+                disabled={isSubmitting}
               />
             </FormControl>
           </FormItem>
 
           <FormItem>
-            <FormLabel className="text-slate-300">Event Type</FormLabel>
+            <FormLabel className="text-slate-300">Event Type *</FormLabel>
             <FormControl>
-              <Select value={formData.type} onValueChange={handleTypeChange}>
+              <Select value={formData.type} onValueChange={handleTypeChange} disabled={isSubmitting}>
                 <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-700 border-slate-600">
                   {eventTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value} className="text-white">
+                    <SelectItem key={type.value} value={type.value} className="text-white hover:bg-slate-600">
                       {type.label}
                     </SelectItem>
                   ))}
@@ -168,6 +221,51 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
               </Select>
             </FormControl>
           </FormItem>
+
+          <FormItem>
+            <FormLabel className="text-slate-300">Venue</FormLabel>
+            <FormControl>
+              <Input
+                name="venue"
+                type="text"
+                placeholder="e.g., St. Peter's Church"
+                value={formData.venue}
+                onChange={handleInputChange}
+                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                disabled={isSubmitting}
+              />
+            </FormControl>
+          </FormItem>
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormItem>
+              <FormLabel className="text-slate-300">Date</FormLabel>
+              <FormControl>
+                <Input
+                  name="date"
+                  type="date"
+                  value={formData.date}
+                  onChange={handleInputChange}
+                  className="bg-slate-700 border-slate-600 text-white"
+                  disabled={isSubmitting}
+                />
+              </FormControl>
+            </FormItem>
+
+            <FormItem>
+              <FormLabel className="text-slate-300">Time</FormLabel>
+              <FormControl>
+                <Input
+                  name="time"
+                  type="time"
+                  value={formData.time}
+                  onChange={handleInputChange}
+                  className="bg-slate-700 border-slate-600 text-white"
+                  disabled={isSubmitting}
+                />
+              </FormControl>
+            </FormItem>
+          </div>
 
           <FormItem>
             <FormLabel className="text-slate-300">Description (Optional)</FormLabel>
@@ -179,6 +277,7 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
                 value={formData.description}
                 onChange={handleInputChange}
                 className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                disabled={isSubmitting}
               />
             </FormControl>
           </FormItem>
@@ -187,16 +286,18 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => onOpenChange(false)}
+              onClick={handleClose}
               className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
               className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
+              disabled={isSubmitting}
             >
-              Create Event
+              {isSubmitting ? 'Creating...' : 'Create Event'}
             </Button>
           </div>
         </form>
