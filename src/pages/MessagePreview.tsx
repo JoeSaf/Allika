@@ -23,6 +23,8 @@ const MessagePreview = () => {
 
   const loadEventData = () => {
     const event = getCurrentEvent();
+    console.log('Current event loaded:', event);
+    console.log('Invitation image:', event?.invitationImage);
     if (!event) return;
     
     setCurrentEvent(event);
@@ -180,16 +182,17 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                 
                 <div className="space-y-4">
                   <div className="bg-slate-800 rounded-lg p-3 max-w-xs">
-                    {/* Image in WhatsApp message - Fixed to properly check for invitation image */}
-                    {currentEvent.invitationImage && (
+                    {/* Fixed image display - check both invitationImage and image properties */}
+                    {(currentEvent.invitationImage || currentEvent.image) && (
                       <div className="mb-3">
                         <img
-                          src={currentEvent.invitationImage}
+                          src={currentEvent.invitationImage || currentEvent.image}
                           alt="Invitation preview"
                           className="w-full h-32 object-cover rounded-lg"
+                          onLoad={() => console.log('Image loaded successfully:', currentEvent.invitationImage || currentEvent.image)}
                           onError={(e) => {
-                            console.log('Image failed to load:', currentEvent.invitationImage);
-                            e.target.style.display = 'none';
+                            console.log('Image failed to load:', currentEvent.invitationImage || currentEvent.image);
+                            console.log('Error event:', e);
                           }}
                         />
                       </div>
