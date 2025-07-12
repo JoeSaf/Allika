@@ -1,13 +1,13 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import EventCreationModal from '@/components/EventCreationModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import { getEvents, deleteEvent, setCurrentEvent } from '@/utils/storage';
 import { format } from 'date-fns';
-import { MoreHorizontal } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import { isUserLoggedIn, requireLogin } from '@/utils/auth';
 
 const Dashboard = () => {
@@ -127,7 +127,6 @@ const Dashboard = () => {
         )}
       </div>
       
-      {/* Add the event creation modal */}
       <EventCreationModal 
         open={showCreateModal} 
         onOpenChange={setShowCreateModal} 

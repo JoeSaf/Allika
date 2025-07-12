@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Heart, Gift, Sparkles, ArrowLeft } from 'lucide-react';
 import { createDefaultEvent, saveEvent, setCurrentEvent } from '@/utils/storage';
+import { isUserLoggedIn, requireLogin } from '@/utils/auth';
 
 const FeaturedTemplates = () => {
   const navigate = useNavigate();
@@ -54,6 +55,12 @@ const FeaturedTemplates = () => {
     : templates;
 
   const handleSelectTemplate = (template: any) => {
+    // Check if user is logged in before allowing template selection
+    if (!isUserLoggedIn()) {
+      navigate(requireLogin(window.location.pathname));
+      return;
+    }
+
     // Create a new event based on the template
     const newEvent = createDefaultEvent(template.type);
     newEvent.title = `New ${template.name}`;
