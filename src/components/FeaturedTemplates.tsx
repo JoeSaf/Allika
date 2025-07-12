@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Header from '@/components/Header';
@@ -8,7 +9,6 @@ import { Heart, Gift, Sparkles, ArrowLeft } from 'lucide-react';
 import { createDefaultEvent, saveEvent, setCurrentEvent } from '@/utils/storage';
 
 const FeaturedTemplates = () => {
-const Templates = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category');
@@ -157,5 +157,5 @@ const Templates = () => {
     </div>
   );
 };
-}
+
 export default FeaturedTemplates;

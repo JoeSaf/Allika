@@ -1,4 +1,3 @@
-
 // Storage utility for managing all app data
 export interface Guest {
   id: string;
@@ -261,4 +260,34 @@ export const simulateQRScan = (eventId: string): Guest | null => {
   checkInGuest(eventId, randomGuest.id);
   
   return randomGuest;
+};
+
+export const generateGuestQRCode = async (eventId: string, guestId: string): Promise<string | null> => {
+  const event = getEvent(eventId);
+  if (!event) return null;
+  
+  const guest = event.guests.find(g => g.id === guestId);
+  if (!guest) return null;
+  
+  try {
+    const { generateQRCodeData, generateQRCodeString } = await import('./qrCodeGenerator');
+    const qrData = generateQRCodeData(guest, event);
+    return await generateQRCodeString(qrData);
+  } catch (error) {
+    console.error('Failed to generate QR code:', error);
+    return null;
+  }
+};
+
+export const generateEventQRCodes = async (eventId: string): Promise<Array<{guest: Guest, qrCode: string}> | null> => {
+  const event = getEvent(eventId);
+  if (!event) return null;
+  
+  try {
+    const { generateBulkQRCodes } = await import('./qrCodeGenerator');
+    return await generateBulkQRCodes(event.guests, event);
+  } catch (error) {
+    console.error('Failed to generate bulk QR codes:', error);
+    return null;
+  }
 };
