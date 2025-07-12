@@ -1,225 +1,137 @@
-
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
+import EventCreationModal from '@/components/EventCreationModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Calendar, Users, MessageSquare, BarChart3, QrCode, Plus, Eye, Trash2, Edit } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { getEvents, deleteEvent, setCurrentEvent, Event } from '@/utils/storage';
-import { useToast } from '@/hooks/use-toast';
+import { PlusCircle } from 'lucide-react';
+import { getEvents, deleteEvent, setCurrentEvent } from '@/utils/storage';
+import { format } from 'date-fns';
+import { MoreHorizontal } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { isUserLoggedIn, requireLogin } from '@/utils/auth';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [events, setEvents] = useState<Event[]>([]);
-  const [stats, setStats] = useState({
-    totalEvents: 0,
-    totalGuests: 0,
-    invitationsSent: 0,
-    activeEvents: 0
-  });
+  const [events, setEvents] = useState(getEvents());
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
-    loadEvents();
-  }, []);
+    // Check if user is logged in
+    if (!isUserLoggedIn()) {
+      navigate(requireLogin('/dashboard'));
+      return;
+    }
+    setEvents(getEvents());
+  }, [navigate]);
 
-  const loadEvents = () => {
-    const savedEvents = getEvents();
-    setEvents(savedEvents);
-    
-    // Calculate stats
-    const totalGuests = savedEvents.reduce((sum, event) => sum + event.guests.length, 0);
-    const invitationsSent = savedEvents.reduce((sum, event) => sum + event.messagesSent, 0);
-    const activeEvents = savedEvents.filter(event => event.status === 'active').length;
-    
-    setStats({
-      totalEvents: savedEvents.length,
-      totalGuests,
-      invitationsSent,
-      activeEvents
-    });
+  const handleCreateEvent = () => {
+    if (!isUserLoggedIn()) {
+      navigate(requireLogin('/dashboard'));
+      return;
+    }
+    setShowCreateModal(true);
   };
 
-  const handleDeleteEvent = (eventId: string) => {
-    deleteEvent(eventId);
-    loadEvents();
-    toast({
-      title: "Event Deleted",
-      description: "The event has been successfully deleted.",
-    });
+  const handleDeleteEvent = (id: string) => {
+    deleteEvent(id);
+    setEvents(getEvents());
   };
 
-  const handleEditEvent = (eventId: string) => {
-    setCurrentEvent(eventId);
-    navigate(`/template/${eventId}`);
+  const handleEditEvent = (id: string) => {
+    setCurrentEvent(id);
+    navigate(`/template/${id}`);
   };
 
-  const handleViewAnalytics = (eventId: string) => {
-    setCurrentEvent(eventId);
-    navigate('/view-analytics');
-  };
-
-  const handleQRScanner = (eventId: string) => {
-    setCurrentEvent(eventId);
-    navigate('/qr-scanner');
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-500';
-      case 'draft': return 'bg-yellow-500';
-      case 'completed': return 'bg-blue-500';
-      default: return 'bg-gray-500';
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      return format(date, 'MMM dd, yyyy');
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return 'Invalid Date';
     }
   };
-
+  
   return (
     <div className="min-h-screen bg-slate-900">
       <Header />
       
       <div className="container mx-auto px-4 py-8 pt-24">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
-            <p className="text-slate-300">Manage your events and invitations</p>
-          </div>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-4xl font-bold text-white">Your Events</h1>
           <Button 
-            onClick={() => navigate('/templates')}
-            className="bg-teal-600 hover:bg-teal-700"
+            onClick={handleCreateEvent}
+            className="bg-gradient-to-r from-teal-500 to-green-600 hover:from-teal-600 hover:to-green-700 text-white"
           >
-            <Plus className="w-4 h-4 mr-2" />
+            <PlusCircle className="w-5 h-5 mr-2" />
             Create Event
           </Button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        {events.length === 0 ? (
           <Card className="bg-slate-800 border-slate-700">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">Total Events</CardTitle>
-              <Calendar className="h-4 w-4 text-teal-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{stats.totalEvents}</div>
+            <CardContent className="text-center py-12">
+              <h3 className="text-xl font-semibold text-slate-400 mb-2">No events yet</h3>
+              <p className="text-slate-500 mb-6">Click the button above to create your first event</p>
+              <Button 
+                onClick={handleCreateEvent}
+                className="bg-teal-600 hover:bg-teal-700"
+              >
+                Create Event
+              </Button>
             </CardContent>
           </Card>
-          
-          <Card className="bg-slate-800 border-slate-700">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">Total Guests</CardTitle>
-              <Users className="h-4 w-4 text-teal-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{stats.totalGuests}</div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-slate-800 border-slate-700">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">Invitations Sent</CardTitle>
-              <MessageSquare className="h-4 w-4 text-teal-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{stats.invitationsSent}</div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-slate-800 border-slate-700">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">Active Events</CardTitle>
-              <BarChart3 className="h-4 w-4 text-teal-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{stats.activeEvents}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Events Table */}
-        <Card className="bg-slate-800 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-white">Recent Events</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {events.length === 0 ? (
-              <div className="text-center py-12">
-                <Calendar className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-slate-400 mb-2">No events yet</h3>
-                <p className="text-slate-500 mb-6">Get started by creating your first event</p>
-                <Button 
-                  onClick={() => navigate('/templates')}
-                  className="bg-teal-600 hover:bg-teal-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Your First Event
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {events.map((event) => (
-                  <div key={event.id} className="flex items-center justify-between p-4 bg-slate-700 rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div>
-                        <h3 className="font-semibold text-white">{event.title || 'Untitled Event'}</h3>
-                        <p className="text-sm text-slate-300">{event.date} {event.time && `at ${event.time}`}</p>
-                        <p className="text-xs text-slate-400">{event.venue}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-4">
-                      <Badge variant="secondary" className="bg-slate-600 text-white">
-                        {event.type}
-                      </Badge>
-                      <Badge className={getStatusColor(event.status)}>
-                        {event.status}
-                      </Badge>
-                      <span className="text-sm text-slate-300">
-                        {event.messagesSent}/{event.guests.length} sent
-                      </span>
-                      
-                      <div className="flex space-x-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleEditEvent(event.id)}
-                          className="border-slate-600 text-slate-300 hover:bg-slate-600"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleViewAnalytics(event.id)}
-                          className="border-slate-600 text-slate-300 hover:bg-slate-600"
-                        >
-                          <BarChart3 className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleQRScanner(event.id)}
-                          className="border-slate-600 text-slate-300 hover:bg-slate-600"
-                        >
-                          <QrCode className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleDeleteEvent(event.id)}
-                          className="border-red-600 text-red-300 hover:bg-red-900"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {events.map((event) => (
+              <Card key={event.id} className="bg-slate-800 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="text-white">{event.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-slate-300 text-sm mb-4">
+                    Type: {event.type}
+                    <br />
+                    Date: {formatDate(event.date)}
+                  </p>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="ml-auto h-8 w-8 p-0 data-[state=open]:bg-muted">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-slate-800 border-slate-700 text-white">
+                      <DropdownMenuLabel className="text-slate-400">Actions</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => handleEditEvent(event.id)} className="hover:bg-slate-700 focus:bg-slate-700">
+                        Edit Event
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator className="bg-slate-700" />
+                      <DropdownMenuItem onClick={() => handleDeleteEvent(event.id)} className="hover:bg-red-700 focus:bg-red-700 text-red-500">
+                        Delete Event
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
+      
+      {/* Add the event creation modal */}
+      <EventCreationModal 
+        open={showCreateModal} 
+        onOpenChange={setShowCreateModal} 
+      />
     </div>
   );
 };
