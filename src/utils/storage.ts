@@ -1,4 +1,4 @@
-// Storage utility for managing all app data
+// Updated storage.ts with proper event details saving
 export interface Guest {
   id: string;
   name: string;
@@ -28,11 +28,26 @@ export interface Event {
   additionalInfo?: string;
   invitingFamily?: string;
   invitationImage?: string;
-  image?: string; // Alternative property name for images
+  image?: string;
   status: 'draft' | 'active' | 'completed';
   guests: Guest[];
   createdAt: string;
   messagesSent: number;
+  // Add invitation template data
+  invitationData?: {
+    coupleName: string;
+    eventDate: string;
+    eventTime: string;
+    venue: string;
+    reception?: string;
+    receptionTime?: string;
+    theme?: string;
+    rsvpContact: string;
+    additionalInfo?: string;
+    invitingFamily?: string;
+    guestName?: string;
+    invitationImage?: string;
+  };
   rsvpSettings: {
     title: string;
     subtitle: string;
@@ -102,24 +117,25 @@ const safeJSONParse = <T>(jsonString: string | null, defaultValue: T): T => {
 const safeJSONStringify = (key: string, data: any): void => {
   try {
     localStorage.setItem(key, JSON.stringify(data));
+    console.log(`Saved ${key} data:`, data);
   } catch (error) {
     console.error('Error storing data to localStorage:', error);
     throw new Error(`Failed to save ${key} data`);
   }
 };
 
-// Event management
+// Event management with detailed saving
 export const saveEvent = (event: Event): void => {
   try {
     const events = getEvents();
     const existingIndex = events.findIndex(e => e.id === event.id);
     
     if (existingIndex >= 0) {
-      events[existingIndex] = event;
-      console.log(`Updated existing event: ${event.title}`);
+      events[existingIndex] = { ...events[existingIndex], ...event };
+      console.log(`Updated existing event: ${event.title}`, event);
     } else {
       events.push(event);
-      console.log(`Added new event: ${event.title}`);
+      console.log(`Added new event: ${event.title}`, event);
     }
     
     safeJSONStringify(STORAGE_KEYS.EVENTS, events);
@@ -128,6 +144,92 @@ export const saveEvent = (event: Event): void => {
     updateAnalytics(event);
   } catch (error) {
     console.error('Error saving event:', error);
+    throw error;
+  }
+};
+
+// New function to save event details from template editor
+export const saveEventDetails = (eventId: string, details: Partial<Event>): void => {
+  try {
+    const events = getEvents();
+    const existingIndex = events.findIndex(e => e.id === eventId);
+    
+    if (existingIndex >= 0) {
+      // Merge the new details with existing event
+      events[existingIndex] = {
+        ...events[existingIndex],
+        ...details
+      };
+      
+      console.log(`Updated event details for: ${eventId}`, events[existingIndex]);
+      safeJSONStringify(STORAGE_KEYS.EVENTS, events);
+      
+      // Update analytics
+      updateAnalytics(events[existingIndex]);
+    } else {
+      console.error(`Event not found for update: ${eventId}`);
+      throw new Error(`Event not found: ${eventId}`);
+    }
+  } catch (error) {
+    console.error('Error saving event details:', error);
+    throw error;
+  }
+};
+
+// New function to save invitation template data
+export const saveInvitationData = (eventId: string, invitationData: any): void => {
+  try {
+    const event = getEvent(eventId);
+    if (!event) {
+      throw new Error(`Event not found: ${eventId}`);
+    }
+    
+    // Update the event with invitation data
+    const updatedEvent = {
+      ...event,
+      invitationData: invitationData,
+      // Also update main event fields from invitation data
+      title: invitationData.coupleName || event.title,
+      date: invitationData.eventDate || event.date,
+      time: invitationData.eventTime || event.time,
+      venue: invitationData.venue || event.venue,
+      reception: invitationData.reception || event.reception,
+      receptionTime: invitationData.receptionTime || event.receptionTime,
+      theme: invitationData.theme || event.theme,
+      rsvpContact: invitationData.rsvpContact || event.rsvpContact,
+      additionalInfo: invitationData.additionalInfo || event.additionalInfo,
+      invitingFamily: invitationData.invitingFamily || event.invitingFamily,
+      invitationImage: invitationData.invitationImage || event.invitationImage
+    };
+    
+    saveEvent(updatedEvent);
+    console.log('Saved invitation data:', invitationData);
+  } catch (error) {
+    console.error('Error saving invitation data:', error);
+    throw error;
+  }
+};
+
+// New function to save RSVP settings
+export const saveRsvpSettings = (eventId: string, rsvpSettings: any): void => {
+  try {
+    const event = getEvent(eventId);
+    if (!event) {
+      throw new Error(`Event not found: ${eventId}`);
+    }
+    
+    const updatedEvent = {
+      ...event,
+      rsvpSettings: {
+        ...event.rsvpSettings,
+        ...rsvpSettings
+      }
+    };
+    
+    saveEvent(updatedEvent);
+    console.log('Saved RSVP settings:', rsvpSettings);
+  } catch (error) {
+    console.error('Error saving RSVP settings:', error);
     throw error;
   }
 };
@@ -148,7 +250,7 @@ export const getEvent = (id: string): Event | null => {
     const events = getEvents();
     const event = events.find(e => e.id === id) || null;
     if (event) {
-      console.log(`Found event: ${event.title}`);
+      console.log(`Found event: ${event.title}`, event);
     } else {
       console.warn(`Event not found with id: ${id}`);
     }
@@ -339,9 +441,19 @@ export const createDefaultEvent = (type: string): Event => {
     venue: '',
     rsvpContact: '',
     status: 'draft',
-    guests: [], // Start with empty guests array
+    guests: [],
     createdAt: now,
-    messagesSent: 0, // No messages sent initially
+    messagesSent: 0,
+    invitationData: {
+      coupleName: '',
+      eventDate: '',
+      eventTime: '',
+      venue: '',
+      rsvpContact: '',
+      additionalInfo: '',
+      invitingFamily: '',
+      guestName: ''
+    },
     rsvpSettings: {
       title: 'Event Invitation',
       subtitle: 'Join us in celebration',

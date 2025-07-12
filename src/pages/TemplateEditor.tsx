@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,8 @@ import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Download, Send, QrCode, Save, Upload, X, Plus, Minus, CheckCircle, XCircle } from 'lucide-react';
 import Header from '@/components/Header';
 import html2canvas from 'html2canvas';
+import { getCurrentEvent, saveInvitationData, saveRsvpSettings, getEvent } from '@/utils/storage';
+import { toast } from '@/hooks/use-toast';
 
 const TemplateEditor = () => {
   const { id } = useParams();
@@ -19,6 +21,8 @@ const TemplateEditor = () => {
   const fileInputRef = useRef(null);
   
   const [selectedTemplate, setSelectedTemplate] = useState('template1');
+  const [currentEvent, setCurrentEvent] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [invitationData, setInvitationData] = useState({
     coupleName: 'James & Patricia',
@@ -59,6 +63,144 @@ const TemplateEditor = () => {
 
   const [activeTab, setActiveTab] = useState('invitation');
 
+  // Load event data on component mount
+  useEffect(() => {
+    loadEventData();
+  }, [id]);
+
+  // Auto-save invitation data when it changes
+  useEffect(() => {
+    if (currentEvent && !isLoading) {
+      const timeoutId = setTimeout(() => {
+        saveInvitationDataToStorage();
+      }, 1000); // Auto-save after 1 second of inactivity
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [invitationData, currentEvent, isLoading]);
+
+  // Auto-save RSVP data when it changes
+  useEffect(() => {
+    if (currentEvent && !isLoading) {
+      const timeoutId = setTimeout(() => {
+        saveRsvpDataToStorage();
+      }, 1000); // Auto-save after 1 second of inactivity
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [rsvpData, currentEvent, isLoading]);
+
+  const loadEventData = () => {
+    try {
+      const event = getEvent(id);
+      if (!event) {
+        toast({
+          title: "Event Not Found",
+          description: "The event you're trying to edit doesn't exist.",
+          variant: "destructive"
+        });
+        navigate('/dashboard');
+        return;
+      }
+
+      setCurrentEvent(event);
+      
+      // Load existing invitation data if available
+      if (event.invitationData) {
+        setInvitationData({
+          coupleName: event.invitationData.coupleName || event.title || 'James & Patricia',
+          eventDate: event.invitationData.eventDate || event.date || 'Saturday 5th July, 2025',
+          eventTime: event.invitationData.eventTime || event.time || '11AM',
+          venue: event.invitationData.venue || event.venue || 'St. Peter\'s Church, Oysterbay',
+          reception: event.invitationData.reception || event.reception || 'Lugalo Golf Club - Kawe',
+          receptionTime: event.invitationData.receptionTime || event.receptionTime || '6:00PM',
+          theme: event.invitationData.theme || event.theme || 'Movie Stars',
+          rsvpContact: event.invitationData.rsvpContact || event.rsvpContact || '+255786543366',
+          additionalInfo: event.invitationData.additionalInfo || event.additionalInfo || 'Kindly confirm your attendance',
+          invitingFamily: event.invitationData.invitingFamily || event.invitingFamily || 'MR. & MRS. FRANCIS BROWN',
+          guestName: event.invitationData.guestName || 'COLLINS VICTOR LEMA',
+          invitationImage: event.invitationData.invitationImage || event.invitationImage || null
+        });
+      } else {
+        // Use event data to populate defaults
+        setInvitationData(prev => ({
+          ...prev,
+          coupleName: event.title || prev.coupleName,
+          eventDate: event.date || prev.eventDate,
+          eventTime: event.time || prev.eventTime,
+          venue: event.venue || prev.venue,
+          reception: event.reception || prev.reception,
+          receptionTime: event.receptionTime || prev.receptionTime,
+          theme: event.theme || prev.theme,
+          rsvpContact: event.rsvpContact || prev.rsvpContact,
+          additionalInfo: event.additionalInfo || prev.additionalInfo,
+          invitingFamily: event.invitingFamily || prev.invitingFamily,
+          invitationImage: event.invitationImage || prev.invitationImage
+        }));
+      }
+
+      // Load RSVP settings
+      if (event.rsvpSettings) {
+        setRsvpData(prev => ({
+          ...prev,
+          ...event.rsvpSettings
+        }));
+      }
+
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error loading event data:', error);
+      toast({
+        title: "Error Loading Event",
+        description: "There was a problem loading the event data.",
+        variant: "destructive"
+      });
+      setIsLoading(false);
+    }
+  };
+
+  const saveInvitationDataToStorage = () => {
+    if (!currentEvent) return;
+    
+    try {
+      saveInvitationData(currentEvent.id, invitationData);
+      console.log('Auto-saved invitation data');
+    } catch (error) {
+      console.error('Error auto-saving invitation data:', error);
+    }
+  };
+
+  const saveRsvpDataToStorage = () => {
+    if (!currentEvent) return;
+    
+    try {
+      saveRsvpSettings(currentEvent.id, rsvpData);
+      console.log('Auto-saved RSVP data');
+    } catch (error) {
+      console.error('Error auto-saving RSVP data:', error);
+    }
+  };
+
+  const handleManualSave = () => {
+    if (!currentEvent) return;
+    
+    try {
+      saveInvitationDataToStorage();
+      saveRsvpDataToStorage();
+      
+      toast({
+        title: "Saved Successfully",
+        description: "Your event details have been saved.",
+      });
+    } catch (error) {
+      toast({
+        title: "Save Error",
+        description: "There was a problem saving your event details.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const templates = {
     template1: {
       name: 'Classic Portrait',
@@ -87,7 +229,8 @@ const TemplateEditor = () => {
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setInvitationData(prev => ({ ...prev, invitationImage: e.target?.result }));
+        const imageData = e.target?.result;
+        setInvitationData(prev => ({ ...prev, invitationImage: imageData }));
       };
       reader.readAsDataURL(file);
     }
@@ -369,34 +512,65 @@ const TemplateEditor = () => {
   };
 
   const handleSendInvitations = () => {
+    // Save data before navigating
+    handleManualSave();
+    
     console.log('Sending invitations with data:', { invitationData, rsvpData });
-    navigate('/preview-message', { 
-      state: { 
-        templateData: { 
-          invitationData, 
-          rsvpData 
-        } 
-      } 
-    });
+    navigate('/preview-message');
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900">
+        <Header />
+        <div className="container mx-auto px-4 py-8 pt-24">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-white text-xl">Loading event...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentEvent) {
+    return (
+      <div className="min-h-screen bg-slate-900">
+        <Header />
+        <div className="container mx-auto px-4 py-8 pt-24">
+          <Card className="bg-slate-800 border-slate-700">
+            <div className="text-center py-12">
+              <h3 className="text-xl font-semibold text-slate-400 mb-2">Event Not Found</h3>
+              <p className="text-slate-500 mb-6">The event you're trying to edit doesn't exist.</p>
+              <Button 
+                onClick={() => navigate('/dashboard')}
+                className="bg-teal-600 hover:bg-teal-700"
+              >
+                Go to Dashboard
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900">
       <Header />
       
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 pt-24">
         <div className="flex items-center gap-4 mb-8">
           <Button 
             variant="outline" 
-            onClick={() => navigate('/templates')}
+            onClick={() => navigate('/dashboard')}
             className="border-slate-600 text-slate-300 hover:bg-slate-700"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Templates
+            Back to Dashboard
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-white">Customize Your Event</h1>
-            <p className="text-slate-300">Design your invitation and RSVP page</p>
+            <p className="text-slate-300">Event: {currentEvent.title}</p>
           </div>
         </div>
 
@@ -1145,13 +1319,14 @@ const TemplateEditor = () => {
             className="flex-1 bg-green-600 hover:bg-green-700 text-white"
           >
             <Send className="w-4 h-4 mr-2" />
-            Send Invitations
+            Preview Messages
           </Button>
           <Button 
+            onClick={handleManualSave}
             className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
           >
             <Save className="w-4 h-4 mr-2" />
-            Save Template
+            Save Changes
           </Button>
         </div>
       </div>

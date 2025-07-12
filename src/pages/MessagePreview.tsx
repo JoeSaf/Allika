@@ -24,8 +24,11 @@ const MessagePreview = () => {
   const loadEventData = () => {
     const event = getCurrentEvent();
     console.log('Current event loaded:', event);
-    console.log('Invitation image:', event?.invitationImage);
-    if (!event) return;
+    
+    if (!event) {
+      console.warn('No current event found');
+      return;
+    }
     
     setCurrentEvent(event);
     
@@ -82,21 +85,31 @@ const MessagePreview = () => {
 
   // Generate WhatsApp message based on event data
   const generateWhatsAppMessage = () => {
-    const sampleGuestName = currentEvent.guests && currentEvent.guests.length > 0 ? currentEvent.guests[0].name : 'Guest';
+    // Use invitation data if available, otherwise fall back to main event data
+    const invitationData = currentEvent.invitationData || {};
+    const coupleName = invitationData.coupleName || currentEvent.title || 'Event';
+    const eventDate = invitationData.eventDate || currentEvent.date || 'TBD';
+    const venue = invitationData.venue || currentEvent.venue || 'TBD';
+    const eventTime = invitationData.eventTime || currentEvent.time || '';
+    const reception = invitationData.reception || currentEvent.reception || '';
+    const receptionTime = invitationData.receptionTime || currentEvent.receptionTime || '';
+    const theme = invitationData.theme || currentEvent.theme || '';
+    const rsvpContact = invitationData.rsvpContact || currentEvent.rsvpContact || '';
+    const guestName = invitationData.guestName || 'Guest';
     
-    return `🎉 Habari ${sampleGuestName}!
+    return `🎉 Habari ${guestName}!
 
-Tafadhali pokea mwaliko wa ${currentEvent.title.toUpperCase()}, Itakayofanyika ${currentEvent.date}, ${currentEvent.venue.toUpperCase()}${currentEvent.time ? `, SAA ${currentEvent.time}` : ''}.
+Tafadhali pokea mwaliko wa ${coupleName.toUpperCase()}, Itakayofanyika ${eventDate}, ${venue.toUpperCase()}${eventTime ? `, SAA ${eventTime}` : ''}.
 
-${currentEvent.reception ? `Followed by reception at ${currentEvent.receptionTime || 'TBD'}, ${currentEvent.reception.toUpperCase()}` : ''}
+${reception ? `Followed by reception at ${receptionTime || 'TBD'}, ${reception.toUpperCase()}` : ''}
 
-${currentEvent.theme ? `THEME: ${currentEvent.theme.toUpperCase()}` : ''}
+${theme ? `THEME: ${theme.toUpperCase()}` : ''}
 
 Tafadhali bofya chaguo mojawapo hapo chini kuthibitisha ushiriki
 
 Karibu Sana!
 
-RSVP: ${currentEvent.rsvpContact || currentEvent.rsvpSettings?.rsvpContact || 'N/A'}
+RSVP: ${rsvpContact || 'N/A'}
 Ujumbe huu, umetumwa kwa kupitia Alika`;
   };
 
@@ -109,6 +122,13 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
 
   const goBackToEditor = () => {
     navigate(`/template/${currentEvent.id}`);
+  };
+
+  // Get the invitation image from either invitationData or main event
+  const getInvitationImage = () => {
+    return currentEvent.invitationData?.invitationImage || 
+           currentEvent.invitationImage || 
+           currentEvent.image;
   };
 
   return (
@@ -127,7 +147,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-white">Message Preview</h1>
-            <p className="text-slate-300">Event: {currentEvent.title}</p>
+            <p className="text-slate-300">Event: {currentEvent.invitationData?.coupleName || currentEvent.title}</p>
           </div>
         </div>
 
@@ -137,20 +157,22 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <p className="text-slate-400 text-sm">Event</p>
-              <p className="text-white font-semibold">{currentEvent.title}</p>
+              <p className="text-white font-semibold">{currentEvent.invitationData?.coupleName || currentEvent.title}</p>
             </div>
             <div>
               <p className="text-slate-400 text-sm">Date & Time</p>
-              <p className="text-white font-semibold">{currentEvent.date}</p>
-              {currentEvent.time && <p className="text-slate-300 text-sm">{currentEvent.time}</p>}
+              <p className="text-white font-semibold">{currentEvent.invitationData?.eventDate || currentEvent.date}</p>
+              {(currentEvent.invitationData?.eventTime || currentEvent.time) && (
+                <p className="text-slate-300 text-sm">{currentEvent.invitationData?.eventTime || currentEvent.time}</p>
+              )}
             </div>
             <div>
               <p className="text-slate-400 text-sm">Venue</p>
-              <p className="text-white font-semibold">{currentEvent.venue}</p>
+              <p className="text-white font-semibold">{currentEvent.invitationData?.venue || currentEvent.venue}</p>
             </div>
             <div>
               <p className="text-slate-400 text-sm">Theme</p>
-              <p className="text-white font-semibold">{currentEvent.theme || 'Not specified'}</p>
+              <p className="text-white font-semibold">{currentEvent.invitationData?.theme || currentEvent.theme || 'Not specified'}</p>
             </div>
           </div>
         </Card>
@@ -182,16 +204,16 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                 
                 <div className="space-y-4">
                   <div className="bg-slate-800 rounded-lg p-3 max-w-xs">
-                    {/* Fixed image display - check both invitationImage and image properties */}
-                    {(currentEvent.invitationImage || currentEvent.image) && (
+                    {/* Display invitation image if available */}
+                    {getInvitationImage() && (
                       <div className="mb-3">
                         <img
-                          src={currentEvent.invitationImage || currentEvent.image}
+                          src={getInvitationImage()}
                           alt="Invitation preview"
                           className="w-full h-32 object-cover rounded-lg"
-                          onLoad={() => console.log('Image loaded successfully:', currentEvent.invitationImage || currentEvent.image)}
+                          onLoad={() => console.log('Image loaded successfully:', getInvitationImage())}
                           onError={(e) => {
-                            console.log('Image failed to load:', currentEvent.invitationImage || currentEvent.image);
+                            console.log('Image failed to load:', getInvitationImage());
                             console.log('Error event:', e);
                           }}
                         />
@@ -279,13 +301,13 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
               >
                 <div className="text-center mb-6">
                   <h3 className="text-2xl font-bold mb-2" style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
-                    {currentEvent.rsvpSettings?.title || currentEvent.title}
+                    {currentEvent.rsvpSettings?.title || currentEvent.invitationData?.coupleName || currentEvent.title}
                   </h3>
                   <p style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
-                    {currentEvent.rsvpSettings?.subtitle || currentEvent.date}
+                    {currentEvent.rsvpSettings?.subtitle || currentEvent.invitationData?.eventDate || currentEvent.date}
                   </p>
                   <p className="text-sm opacity-75" style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
-                    {currentEvent.venue}
+                    {currentEvent.rsvpSettings?.location || currentEvent.invitationData?.venue || currentEvent.venue}
                   </p>
                 </div>
 
@@ -306,8 +328,8 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                         size="sm"
                         className="flex items-center justify-center gap-2"
                         style={{ 
-                          borderColor: currentEvent.rsvpSettings?.accentColor || '#000000', 
-                          color: currentEvent.rsvpSettings?.accentColor || '#000000',
+                          borderColor: currentEvent.rsvpSettings?.accentColor || '#14b8a6', 
+                          color: currentEvent.rsvpSettings?.accentColor || '#14b8a6',
                           backgroundColor: 'transparent'
                         }}
                       >
@@ -330,7 +352,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                     </div>
                   </div>
                   
-                  {currentEvent.rsvpSettings.guestCountEnabled && (
+                  {currentEvent.rsvpSettings?.guestCountEnabled && (
                     <div>
                       <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
                         {currentEvent.rsvpSettings.guestCountLabel}
@@ -339,11 +361,11 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                         className="w-full p-2 rounded-lg border text-sm"
                         style={{ 
                           backgroundColor: currentEvent.rsvpSettings?.backgroundColor || '#1e293b',
-                          borderColor: currentEvent.rsvpSettings?.accentColor || '#000000',
+                          borderColor: currentEvent.rsvpSettings?.accentColor || '#14b8a6',
                           color: currentEvent.rsvpSettings?.textColor || '#ffffff'
                         }}
                       >
-                        {currentEvent.rsvpSettings.guestCountOptions.map((option, index) => (
+                        {currentEvent.rsvpSettings.guestCountOptions?.map((option, index) => (
                           <option key={index} value={option}>{option}</option>
                         ))}
                       </select>
@@ -351,7 +373,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                   )}
 
                   {/* Render additional custom fields */}
-                  {currentEvent.rsvpSettings.additionalFields.map((field) => (
+                  {currentEvent.rsvpSettings?.additionalFields?.map((field) => (
                     <div key={field.id}>
                       <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
                         {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
@@ -362,7 +384,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                           className="w-full p-2 rounded-lg border text-sm"
                           style={{ 
                             backgroundColor: currentEvent.rsvpSettings?.backgroundColor || '#1e293b',
-                            borderColor: currentEvent.rsvpSettings?.accentColor || '#000000',
+                            borderColor: currentEvent.rsvpSettings?.accentColor || '#14b8a6',
                             color: currentEvent.rsvpSettings?.textColor || '#ffffff'
                           }}
                         />
@@ -372,7 +394,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                           className="w-full p-2 rounded-lg border h-16 text-sm"
                           style={{ 
                             backgroundColor: currentEvent.rsvpSettings?.backgroundColor || '#1e293b',
-                            borderColor: currentEvent.rsvpSettings?.accentColor || '#000000',
+                            borderColor: currentEvent.rsvpSettings?.accentColor || '#14b8a6',
                             color: currentEvent.rsvpSettings?.textColor || '#ffffff'
                           }}
                         />
@@ -382,7 +404,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                           className="w-full p-2 rounded-lg border text-sm"
                           style={{ 
                             backgroundColor: currentEvent.rsvpSettings?.backgroundColor || '#1e293b',
-                            borderColor: currentEvent.rsvpSettings?.accentColor || '#000000',
+                            borderColor: currentEvent.rsvpSettings?.accentColor || '#14b8a6',
                             color: currentEvent.rsvpSettings?.textColor || '#ffffff'
                           }}
                         >
@@ -395,7 +417,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                     </div>
                   ))}
                   
-                  {currentEvent.rsvpSettings.specialRequestsEnabled && (
+                  {currentEvent.rsvpSettings?.specialRequestsEnabled && (
                     <div>
                       <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
                         {currentEvent.rsvpSettings.specialRequestsLabel}
@@ -405,7 +427,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                         placeholder={currentEvent.rsvpSettings.specialRequestsPlaceholder}
                         style={{ 
                           backgroundColor: currentEvent.rsvpSettings?.backgroundColor || '#1e293b',
-                          borderColor: currentEvent.rsvpSettings?.accentColor || '#000000',
+                          borderColor: currentEvent.rsvpSettings?.accentColor || '#14b8a6',
                           color: currentEvent.rsvpSettings?.textColor || '#ffffff'
                         }}
                       />
@@ -415,7 +437,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                   <Button 
                     className="w-full py-2 font-semibold text-sm"
                     style={{ 
-                      backgroundColor: currentEvent.rsvpSettings?.buttonColor || '#000000',
+                      backgroundColor: currentEvent.rsvpSettings?.buttonColor || '#0d9488',
                       color: '#ffffff'
                     }}
                   >
