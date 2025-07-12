@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,7 +80,7 @@ const MessagePreview = () => {
 
   // Generate WhatsApp message based on event data
   const generateWhatsAppMessage = () => {
-    const sampleGuestName = currentEvent.guests.length > 0 ? currentEvent.guests[0].name : 'Guest';
+    const sampleGuestName = currentEvent.guests && currentEvent.guests.length > 0 ? currentEvent.guests[0].name : 'Guest';
     
     return `🎉 Habari ${sampleGuestName}!
 
@@ -95,7 +94,7 @@ Tafadhali bofya chaguo mojawapo hapo chini kuthibitisha ushiriki
 
 Karibu Sana!
 
-RSVP: ${currentEvent.rsvpContact}
+RSVP: ${currentEvent.rsvpContact || currentEvent.rsvpSettings?.rsvpContact || 'N/A'}
 Ujumbe huu, umetumwa kwa kupitia Alika`;
   };
 
@@ -181,13 +180,17 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                 
                 <div className="space-y-4">
                   <div className="bg-slate-800 rounded-lg p-3 max-w-xs">
-                    {/* Image in WhatsApp message */}
+                    {/* Image in WhatsApp message - Fixed to properly check for invitation image */}
                     {currentEvent.invitationImage && (
                       <div className="mb-3">
                         <img
                           src={currentEvent.invitationImage}
                           alt="Invitation preview"
                           className="w-full h-32 object-cover rounded-lg"
+                          onError={(e) => {
+                            console.log('Image failed to load:', currentEvent.invitationImage);
+                            e.target.style.display = 'none';
+                          }}
                         />
                       </div>
                     )}
@@ -207,7 +210,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                       } text-white`}
                     >
                       <CheckCircle className="w-3 h-3 mr-1" />
-                      {currentEvent.rsvpSettings.confirmText}
+                      {currentEvent.rsvpSettings?.confirmText || 'Confirm'}
                     </Button>
                     <Button
                       size="sm"
@@ -219,7 +222,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                       } text-white`}
                     >
                       <XCircle className="w-3 h-3 mr-1" />
-                      {currentEvent.rsvpSettings.declineText}
+                      {currentEvent.rsvpSettings?.declineText || 'Decline'}
                     </Button>
                   </div>
                   
@@ -227,7 +230,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                     <div className="bg-slate-600 rounded-lg p-3 max-w-xs ml-auto">
                       <p className="text-white text-sm">
                         {selectedResponse === 'accept' 
-                          ? currentEvent.rsvpSettings.thankYouMessage 
+                          ? (currentEvent.rsvpSettings?.thankYouMessage || 'Thank you for confirming!')
                           : 'Thank you for letting us know. We\'ll miss you!'}
                       </p>
                       <p className="text-slate-400 text-xs mt-2">17:40 ✓✓</p>
@@ -269,27 +272,29 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
               {/* Dynamic RSVP Form using event data */}
               <div 
                 className="rounded-lg p-6 max-w-md mx-auto"
-                style={{ backgroundColor: currentEvent.rsvpSettings.backgroundColor }}
+                style={{ backgroundColor: currentEvent.rsvpSettings?.backgroundColor || '#1e293b' }}
               >
                 <div className="text-center mb-6">
-                  <h3 className="text-2xl font-bold mb-2" style={{ color: currentEvent.rsvpSettings.textColor }}>
-                    {currentEvent.rsvpSettings.title}
+                  <h3 className="text-2xl font-bold mb-2" style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
+                    {currentEvent.rsvpSettings?.title || currentEvent.title}
                   </h3>
-                  <p style={{ color: currentEvent.rsvpSettings.textColor }}>{currentEvent.rsvpSettings.subtitle}</p>
-                  <p className="text-sm opacity-75" style={{ color: currentEvent.rsvpSettings.textColor }}>
+                  <p style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
+                    {currentEvent.rsvpSettings?.subtitle || currentEvent.date}
+                  </p>
+                  <p className="text-sm opacity-75" style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
                     {currentEvent.venue}
                   </p>
                 </div>
 
                 <div className="mb-6">
-                  <p className="text-center text-sm" style={{ color: currentEvent.rsvpSettings.textColor }}>
-                    {currentEvent.rsvpSettings.welcomeMessage}
+                  <p className="text-center text-sm" style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
+                    {currentEvent.rsvpSettings?.welcomeMessage || 'Please confirm your attendance'}
                   </p>
                 </div>
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings.textColor }}>
+                    <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
                       Will you be attending?
                     </label>
                     <div className="grid grid-cols-1 gap-2">
@@ -298,13 +303,13 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                         size="sm"
                         className="flex items-center justify-center gap-2"
                         style={{ 
-                          borderColor: currentEvent.rsvpSettings.accentColor, 
-                          color: currentEvent.rsvpSettings.accentColor,
+                          borderColor: currentEvent.rsvpSettings?.accentColor || '#000000', 
+                          color: currentEvent.rsvpSettings?.accentColor || '#000000',
                           backgroundColor: 'transparent'
                         }}
                       >
                         <CheckCircle className="w-4 h-4" />
-                        {currentEvent.rsvpSettings.confirmText}
+                        {currentEvent.rsvpSettings?.confirmText || 'Confirm'}
                       </Button>
                       <Button 
                         variant="outline" 
@@ -317,22 +322,22 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                         }}
                       >
                         <XCircle className="w-4 h-4" />
-                        {currentEvent.rsvpSettings.declineText}
+                        {currentEvent.rsvpSettings?.declineText || 'Decline'}
                       </Button>
                     </div>
                   </div>
                   
                   {currentEvent.rsvpSettings.guestCountEnabled && (
                     <div>
-                      <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings.textColor }}>
+                      <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
                         {currentEvent.rsvpSettings.guestCountLabel}
                       </label>
                       <select 
                         className="w-full p-2 rounded-lg border text-sm"
                         style={{ 
-                          backgroundColor: currentEvent.rsvpSettings.backgroundColor,
-                          borderColor: currentEvent.rsvpSettings.accentColor,
-                          color: currentEvent.rsvpSettings.textColor
+                          backgroundColor: currentEvent.rsvpSettings?.backgroundColor || '#1e293b',
+                          borderColor: currentEvent.rsvpSettings?.accentColor || '#000000',
+                          color: currentEvent.rsvpSettings?.textColor || '#ffffff'
                         }}
                       >
                         {currentEvent.rsvpSettings.guestCountOptions.map((option, index) => (
@@ -345,7 +350,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                   {/* Render additional custom fields */}
                   {currentEvent.rsvpSettings.additionalFields.map((field) => (
                     <div key={field.id}>
-                      <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings.textColor }}>
+                      <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
                         {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
                       </label>
                       {field.type === 'text' && (
@@ -353,9 +358,9 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                           type="text"
                           className="w-full p-2 rounded-lg border text-sm"
                           style={{ 
-                            backgroundColor: currentEvent.rsvpSettings.backgroundColor,
-                            borderColor: currentEvent.rsvpSettings.accentColor,
-                            color: currentEvent.rsvpSettings.textColor
+                            backgroundColor: currentEvent.rsvpSettings?.backgroundColor || '#1e293b',
+                            borderColor: currentEvent.rsvpSettings?.accentColor || '#000000',
+                            color: currentEvent.rsvpSettings?.textColor || '#ffffff'
                           }}
                         />
                       )}
@@ -363,9 +368,9 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                         <textarea
                           className="w-full p-2 rounded-lg border h-16 text-sm"
                           style={{ 
-                            backgroundColor: currentEvent.rsvpSettings.backgroundColor,
-                            borderColor: currentEvent.rsvpSettings.accentColor,
-                            color: currentEvent.rsvpSettings.textColor
+                            backgroundColor: currentEvent.rsvpSettings?.backgroundColor || '#1e293b',
+                            borderColor: currentEvent.rsvpSettings?.accentColor || '#000000',
+                            color: currentEvent.rsvpSettings?.textColor || '#ffffff'
                           }}
                         />
                       )}
@@ -373,9 +378,9 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                         <select
                           className="w-full p-2 rounded-lg border text-sm"
                           style={{ 
-                            backgroundColor: currentEvent.rsvpSettings.backgroundColor,
-                            borderColor: currentEvent.rsvpSettings.accentColor,
-                            color: currentEvent.rsvpSettings.textColor
+                            backgroundColor: currentEvent.rsvpSettings?.backgroundColor || '#1e293b',
+                            borderColor: currentEvent.rsvpSettings?.accentColor || '#000000',
+                            color: currentEvent.rsvpSettings?.textColor || '#ffffff'
                           }}
                         >
                           <option>Select an option</option>
@@ -389,16 +394,16 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                   
                   {currentEvent.rsvpSettings.specialRequestsEnabled && (
                     <div>
-                      <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings.textColor }}>
+                      <label className="block font-medium mb-2 text-sm" style={{ color: currentEvent.rsvpSettings?.textColor || '#ffffff' }}>
                         {currentEvent.rsvpSettings.specialRequestsLabel}
                       </label>
                       <textarea 
                         className="w-full p-2 rounded-lg border h-16 text-sm"
                         placeholder={currentEvent.rsvpSettings.specialRequestsPlaceholder}
                         style={{ 
-                          backgroundColor: currentEvent.rsvpSettings.backgroundColor,
-                          borderColor: currentEvent.rsvpSettings.accentColor,
-                          color: currentEvent.rsvpSettings.textColor
+                          backgroundColor: currentEvent.rsvpSettings?.backgroundColor || '#1e293b',
+                          borderColor: currentEvent.rsvpSettings?.accentColor || '#000000',
+                          color: currentEvent.rsvpSettings?.textColor || '#ffffff'
                         }}
                       />
                     </div>
@@ -407,11 +412,11 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
                   <Button 
                     className="w-full py-2 font-semibold text-sm"
                     style={{ 
-                      backgroundColor: currentEvent.rsvpSettings.buttonColor,
+                      backgroundColor: currentEvent.rsvpSettings?.buttonColor || '#000000',
                       color: '#ffffff'
                     }}
                   >
-                    {currentEvent.rsvpSettings.submitButtonText}
+                    {currentEvent.rsvpSettings?.submitButtonText || 'Submit'}
                   </Button>
                 </div>
               </div>
