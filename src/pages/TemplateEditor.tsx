@@ -12,6 +12,7 @@ import Header from '@/components/Header';
 import html2canvas from 'html2canvas';
 import { getCurrentEvent, saveInvitationData, saveRsvpSettings, getEvent } from '@/utils/storage';
 import { toast } from '@/hooks/use-toast';
+import SendInvitationModal from '@/components/SendInvitationModal';
 
 const TemplateEditor = () => {
   const { id } = useParams();
@@ -62,6 +63,7 @@ const TemplateEditor = () => {
   });
 
   const [activeTab, setActiveTab] = useState('invitation');
+  const [showSendModal, setShowSendModal] = useState(false);
 
   // Load event data on component mount
   useEffect(() => {
@@ -1306,17 +1308,17 @@ const TemplateEditor = () => {
         </Tabs>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 mt-8">
-          <Button 
-            onClick={() => handleDownload(activeTab === 'invitation' ? 'invitation' : 'rsvp')}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+        <div className="flex gap-4 mt-8">
+          <button
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
+            onClick={() => setShowSendModal(true)}
           >
-            <Download className="w-4 h-4 mr-2" />
-            Download {activeTab === 'invitation' ? 'Invitation' : 'RSVP Page'}
-          </Button>
-          <Button 
-            onClick={handleSendInvitations}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+            <Send className="w-5 h-5" />
+            Send Invitation
+          </button>
+          <Button
+            onClick={() => setActiveTab('preview')}
+            className="bg-green-600 hover:bg-green-700 text-white flex-1 flex items-center justify-center gap-2"
           >
             <Send className="w-4 h-4 mr-2" />
             Preview Messages
@@ -1330,6 +1332,12 @@ const TemplateEditor = () => {
           </Button>
         </div>
       </div>
+      <SendInvitationModal
+        open={showSendModal}
+        onClose={() => setShowSendModal(false)}
+        eventId={currentEvent?.id}
+        template={currentEvent}
+      />
     </div>
   );
 };

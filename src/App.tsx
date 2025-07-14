@@ -1,8 +1,9 @@
+import { useEffect, useRef } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Templates from "./pages/Templates";
@@ -13,18 +14,21 @@ import ViewAnalytics from "./pages/ViewAnalytics";
 import QrScanner from "./pages/QrScanner";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import { logoutUser, isUserLoggedIn } from "@/utils/auth";
+import { toast } from "@/hooks/use-toast";
+import IdleSessionHandler from "@/components/IdleSessionHandler";
 
 const queryClient = new QueryClient();
 
 const App = () => {
-  console.log('App component rendering...'); // Debug log
-  
+  // Removed useNavigate and idle session logic
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <IdleSessionHandler />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FormItem, FormLabel, FormControl } from '@/components/ui/form';
+import { Label } from '@/components/ui/label';
 import { createDefaultEvent, saveEvent, setCurrentEvent } from '@/utils/storage';
 import { toast } from '@/hooks/use-toast';
 
@@ -185,102 +185,98 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
       <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
         <DialogHeader>
           <DialogTitle className="text-white text-xl">Create New Event</DialogTitle>
+          <DialogDescription>
+            Fill in the details below to create a new event.
+          </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          <FormItem>
-            <FormLabel className="text-slate-300">Event Name *</FormLabel>
-            <FormControl>
-              <Input
-                name="name"
-                type="text"
-                placeholder="e.g., Sarah & John's Wedding"
-                value={formData.name}
-                onChange={handleInputChange}
-                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-slate-300">Event Name *</Label>
+            <Input
+              id="name"
+              name="name"
+              type="text"
+              placeholder="e.g., Sarah & John's Wedding"
+              value={formData.name}
+              onChange={handleInputChange}
+              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
                 required
                 disabled={isSubmitting}
               />
-            </FormControl>
-          </FormItem>
-
-          <FormItem>
-            <FormLabel className="text-slate-300">Event Type *</FormLabel>
-            <FormControl>
-              <Select value={formData.type} onValueChange={handleTypeChange} disabled={isSubmitting}>
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600">
-                  {eventTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value} className="text-white hover:bg-slate-600">
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormControl>
-          </FormItem>
-
-          <FormItem>
-            <FormLabel className="text-slate-300">Venue</FormLabel>
-            <FormControl>
-              <Input
-                name="venue"
-                type="text"
-                placeholder="e.g., St. Peter's Church"
-                value={formData.venue}
-                onChange={handleInputChange}
-                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
-                disabled={isSubmitting}
-              />
-            </FormControl>
-          </FormItem>
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormItem>
-              <FormLabel className="text-slate-300">Date</FormLabel>
-              <FormControl>
-                <Input
-                  name="date"
-                  type="date"
-                  value={formData.date}
-                  onChange={handleInputChange}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  disabled={isSubmitting}
-                />
-              </FormControl>
-            </FormItem>
-
-            <FormItem>
-              <FormLabel className="text-slate-300">Time</FormLabel>
-              <FormControl>
-                <Input
-                  name="time"
-                  type="time"
-                  value={formData.time}
-                  onChange={handleInputChange}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  disabled={isSubmitting}
-                />
-              </FormControl>
-            </FormItem>
           </div>
 
-          <FormItem>
-            <FormLabel className="text-slate-300">Description (Optional)</FormLabel>
-            <FormControl>
+          <div className="space-y-2">
+            <Label htmlFor="type" className="text-slate-300">Event Type *</Label>
+            <Select value={formData.type} onValueChange={handleTypeChange} disabled={isSubmitting}>
+              <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-700 border-slate-600">
+                {eventTypes.map((type) => (
+                  <SelectItem key={type.value} value={type.value} className="text-white hover:bg-slate-600">
+                    {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="venue" className="text-slate-300">Venue</Label>
+            <Input
+              id="venue"
+              name="venue"
+              type="text"
+              placeholder="e.g., St. Peter's Church"
+              value={formData.venue}
+              onChange={handleInputChange}
+              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="date" className="text-slate-300">Date</Label>
               <Input
-                name="description"
-                type="text"
-                placeholder="Brief description of your event"
-                value={formData.description}
+                id="date"
+                name="date"
+                type="date"
+                value={formData.date}
                 onChange={handleInputChange}
-                className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                className="bg-slate-700 border-slate-600 text-white"
                 disabled={isSubmitting}
               />
-            </FormControl>
-          </FormItem>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="time" className="text-slate-300">Time</Label>
+              <Input
+                id="time"
+                name="time"
+                type="time"
+                value={formData.time}
+                onChange={handleInputChange}
+                className="bg-slate-700 border-slate-600 text-white"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description" className="text-slate-300">Description (Optional)</Label>
+            <Input
+              id="description"
+              name="description"
+              type="text"
+              placeholder="Brief description of your event"
+              value={formData.description}
+              onChange={handleInputChange}
+              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+              disabled={isSubmitting}
+            />
+          </div>
 
           <div className="flex gap-3 pt-4">
             <Button 
