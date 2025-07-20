@@ -25,6 +25,7 @@ export interface Event {
   receptionTime?: string;
   theme?: string;
   rsvpContact: string;
+  rsvpContactSecondary?: string;
   additionalInfo?: string;
   invitingFamily?: string;
   invitationImage?: string;
@@ -43,6 +44,7 @@ export interface Event {
     receptionTime?: string;
     theme?: string;
     rsvpContact: string;
+    rsvpContactSecondary?: string;
     additionalInfo?: string;
     invitingFamily?: string;
     guestName?: string;
@@ -75,6 +77,7 @@ export interface Event {
     buttonColor: string;
     accentColor: string;
     rsvpContact?: string;
+    rsvpContactSecondary?: string;
   };
 }
 
@@ -197,6 +200,7 @@ export const saveInvitationData = (eventId: string, invitationData: any): void =
       receptionTime: invitationData.receptionTime || event.receptionTime,
       theme: invitationData.theme || event.theme,
       rsvpContact: invitationData.rsvpContact || event.rsvpContact,
+      rsvpContactSecondary: invitationData.rsvpContactSecondary || event.rsvpContactSecondary,
       additionalInfo: invitationData.additionalInfo || event.additionalInfo,
       invitingFamily: invitationData.invitingFamily || event.invitingFamily,
       invitationImage: invitationData.invitationImage || event.invitationImage
@@ -424,60 +428,6 @@ export const getCurrentEvent = (): Event | null => {
 };
 
 // Utility functions
-export const generateId = (): string => {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
-};
-
-export const createDefaultEvent = (type: string): Event => {
-  const id = generateId();
-  const now = new Date().toISOString();
-  
-  return {
-    id,
-    title: '',
-    type,
-    date: '',
-    time: '',
-    venue: '',
-    rsvpContact: '',
-    status: 'draft',
-    guests: [],
-    createdAt: now,
-    messagesSent: 0,
-    invitationData: {
-      coupleName: '',
-      eventDate: '',
-      eventTime: '',
-      venue: '',
-      rsvpContact: '',
-      additionalInfo: '',
-      invitingFamily: '',
-      guestName: ''
-    },
-    rsvpSettings: {
-      title: 'Event Invitation',
-      subtitle: 'Join us in celebration',
-      location: '',
-      welcomeMessage: 'We would be honored by your presence',
-      confirmText: 'Accept',
-      declineText: 'Decline',
-      guestCountEnabled: true,
-      guestCountLabel: 'Number of guests',
-      guestCountOptions: ['1', '2', '3', '4', '5+'],
-      specialRequestsEnabled: true,
-      specialRequestsLabel: 'Special requests or dietary requirements',
-      specialRequestsPlaceholder: 'Any special requests...',
-      additionalFields: [],
-      submitButtonText: 'Submit RSVP',
-      thankYouMessage: 'Thank you for your response!',
-      backgroundColor: '#1e293b',
-      textColor: '#ffffff',
-      buttonColor: '#0d9488',
-      accentColor: '#14b8a6'
-    }
-  };
-};
-
 export const simulateQRScan = (eventId: string): Guest | null => {
   try {
     const event = getEvent(eventId);

@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Heart, Gift, Sparkles, ArrowLeft } from 'lucide-react';
-import { createDefaultEvent, saveEvent, setCurrentEvent } from '@/utils/storage';
+import { createEvent, updateRsvpSettings } from '@/services/api';
+
 import { isUserLoggedIn, requireLogin } from '@/utils/auth';
 
 const FeaturedTemplates = () => {
@@ -54,40 +55,34 @@ const FeaturedTemplates = () => {
     ? templates.filter(template => template.category === category)
     : templates;
 
-  const handleSelectTemplate = (template: any) => {
+  const handleSelectTemplate = async (template: any) => {
     // Check if user is logged in before allowing template selection
     if (!isUserLoggedIn()) {
       navigate(requireLogin(window.location.pathname));
       return;
     }
-
-    // Create a new event based on the template
-    const newEvent = createDefaultEvent(template.type);
-    newEvent.title = `New ${template.name}`;
-    
-    // Customize RSVP settings based on template type
-    if (template.type === 'wedding') {
-      newEvent.rsvpSettings.title = 'Wedding Invitation';
-      newEvent.rsvpSettings.subtitle = 'Join us in celebration of our special day';
-      newEvent.rsvpSettings.welcomeMessage = 'We would be honored by your presence at our wedding';
-    } else if (template.type === 'birthday') {
-      newEvent.rsvpSettings.title = 'Birthday Party';
-      newEvent.rsvpSettings.subtitle = 'Come celebrate with us!';
-      newEvent.rsvpSettings.welcomeMessage = 'Join us for an amazing birthday celebration';
-    } else if (template.type === 'awards') {
-      newEvent.rsvpSettings.title = 'Awards Ceremony';
-      newEvent.rsvpSettings.subtitle = 'An evening of recognition and celebration';
-      newEvent.rsvpSettings.welcomeMessage = 'You are cordially invited to our awards ceremony';
-      newEvent.rsvpSettings.guestCountEnabled = false;
-      newEvent.rsvpSettings.specialRequestsEnabled = false;
+    try {
+      // 1. Create event via backend
+      const eventPayload = {
+        title: `New ${template.name}`,
+        type: template.type,
+        date: '',
+        time: '',
+        venue: '',
+        additionalInfo: ''
+      };
+      const res = await createEvent(eventPayload);
+      if (!res || !res.data || !res.data.event) throw new Error('Event creation failed');
+      const newEvent = res.data.event;
+      // Note: RSVP settings are already created by the backend with appropriate defaults
+      // Users can customize them later in the template editor if needed
+      // Store the current event ID in localStorage for the template editor
+      localStorage.setItem('alika_current_event', newEvent.id);
+      navigate(`/template/${newEvent.id}?template=${template.id}`);
+    } catch (error) {
+      console.error('Error creating event:', error);
+      // Optionally show a toast or error message
     }
-    
-    // Save the event and set it as current
-    saveEvent(newEvent);
-    setCurrentEvent(newEvent.id);
-    
-    // Navigate to template editor with the selected template
-    navigate(`/template/${newEvent.id}?template=${template.id}`);
   };
 
   return (

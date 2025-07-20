@@ -1,5 +1,6 @@
 import express from 'express';
 import multer from 'multer';
+import XLSX from 'xlsx';
 import { getPool } from '../config/database.js';
 import { authenticateToken, requireEventOwnership } from '../middleware/auth.js';
 import { validateCreateGuest, validateBulkGuestUpload, validateUUID, validateEventId } from '../middleware/validation.js';
@@ -15,10 +16,14 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'text/csv' || file.mimetype === 'application/vnd.ms-excel') {
+    if (
+      file.mimetype === 'text/csv' ||
+      file.mimetype === 'application/vnd.ms-excel' ||
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ) {
       cb(null, true);
     } else {
-      cb(new Error('Only CSV files are allowed'), false);
+      cb(new Error('Only CSV or XLSX files are allowed'), false);
     }
   }
 });
@@ -30,16 +35,28 @@ router.use(authenticateToken);
 router.post('/:eventId', validateEventId, requireEventOwnership, validateCreateGuest, async (req, res) => {
   try {
     const { eventId } = req.params;
-    const {
-      name,
-      email,
-      phone,
-      tableNumber,
-      guestCount,
-      specialRequests
-    } = req.body;
-
+    const { name, email, phone, tableNumber, guestCount, specialRequests } = req.body;
     const pool = getPool();
+
+    // Check for duplicate phone number if phone is provided
+    if (phone) {
+      const formattedPhone = formatPhoneNumber(phone);
+      const [existing] = await pool.execute(
+        'SELECT id, name FROM guests WHERE event_id = ? AND phone = ?',
+        [eventId, formattedPhone]
+      );
+      
+      if (existing.length > 0) {
+        return res.status(400).json({
+          error: true,
+          message: `Phone number ${formattedPhone} is already registered for guest: ${existing[0].name}`,
+          data: {
+            existingGuest: existing[0]
+          }
+        });
+      }
+    }
+
     const guestId = generateId();
     const rsvpToken = generateRSVPToken();
 
@@ -53,8 +70,15 @@ router.post('/:eventId', validateEventId, requireEventOwnership, validateCreateG
         special_requests, rsvp_token
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        guestId, eventId, name, email, formattedPhone, tableNumber,
-        guestCount || 1, specialRequests, rsvpToken
+        guestId,
+        eventId,
+        name ?? null,
+        email ?? null,
+        formattedPhone ?? null,
+        tableNumber ?? null,
+        guestCount ?? 1,
+        specialRequests ?? null,
+        rsvpToken
       ]
     );
 
@@ -90,12 +114,96 @@ router.post('/:eventId', validateEventId, requireEventOwnership, validateCreateG
   }
 });
 
+// POST /api/guests/:eventId/check-duplicates - Check for duplicate phone numbers
+router.post('/:eventId/check-duplicates', validateEventId, requireEventOwnership, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { phoneNumbers } = req.body;
+    
+    if (!phoneNumbers || !Array.isArray(phoneNumbers)) {
+      return res.status(400).json({
+        error: true,
+        message: 'Phone numbers array is required'
+      });
+    }
+
+    const duplicates = await checkDuplicatePhones(eventId, phoneNumbers);
+    
+    res.json({
+      success: true,
+      data: {
+        duplicates: duplicates.map(d => ({
+          phone: d.phone,
+          existingGuest: d.existingGuest.name
+        })),
+        hasDuplicates: duplicates.length > 0
+      }
+    });
+
+  } catch (error) {
+    console.error('Check duplicates error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Error checking for duplicates'
+    });
+  }
+});
+
+// Helper function to check for duplicate phone numbers
+async function checkDuplicatePhones(eventId, phoneNumbers) {
+  const pool = getPool();
+  const duplicates = [];
+
+  for (const phone of phoneNumbers) {
+    if (!phone) continue;
+    const formattedPhone = formatPhoneNumber(phone);
+    // Find guests with this phone
+    const [existing] = await pool.execute(
+      'SELECT id, name, phone FROM guests WHERE event_id = ? AND phone = ?',
+      [eventId, formattedPhone]
+    );
+    if (existing.length > 0) {
+      // Check if there is a successful message_log for this guest/phone
+      const [logs] = await pool.execute(
+        `SELECT * FROM message_logs WHERE event_id = ? AND guest_id = ? AND recipient = ? AND status IN ('sent', 'delivered') LIMIT 1`,
+        [eventId, existing[0].id, formattedPhone]
+      );
+      if (logs.length > 0) {
+        duplicates.push({
+          phone: formattedPhone,
+          existingGuest: existing[0]
+        });
+      }
+    }
+  }
+  return duplicates;
+}
+
 // POST /api/guests/:eventId/bulk - Add multiple guests
 router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBulkGuestUpload, async (req, res) => {
   try {
     const { eventId } = req.params;
     const { guests } = req.body;
     const pool = getPool();
+
+    console.log('Bulk guest creation request:', { eventId, guestCount: guests.length, guests });
+
+    // Check for duplicate phone numbers
+    const phoneNumbers = guests.map(g => g.phone).filter(Boolean);
+    const duplicates = await checkDuplicatePhones(eventId, phoneNumbers);
+    
+    if (duplicates.length > 0) {
+      return res.status(400).json({
+        error: true,
+        message: 'Duplicate phone numbers found',
+        data: {
+          duplicates: duplicates.map(d => ({
+            phone: d.phone,
+            existingGuest: d.existingGuest.name
+          }))
+        }
+      });
+    }
 
     const createdGuests = [];
     const errors = [];
@@ -106,8 +214,11 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
         const guestId = generateId();
         const rsvpToken = generateRSVPToken();
 
+        console.log(`Processing guest ${i + 1}:`, { name: guest.name, phone: guest.phone });
+
         // Format phone number if provided
         const formattedPhone = guest.phone ? formatPhoneNumber(guest.phone) : null;
+        console.log('Formatted phone:', formattedPhone);
 
         // Create guest
         await pool.execute(
@@ -116,10 +227,19 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
             special_requests, rsvp_token
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            guestId, eventId, guest.name, guest.email, formattedPhone,
-            guest.tableNumber, guest.guestCount || 1, guest.specialRequests, rsvpToken
+            guestId, 
+            eventId, 
+            guest.name, 
+            guest.email || null, 
+            formattedPhone || null,
+            guest.tableNumber || null, 
+            guest.guestCount || 1, 
+            guest.specialRequests || null, 
+            rsvpToken
           ]
         );
+
+        console.log(`Guest ${i + 1} created with ID:`, guestId);
 
         // Generate QR code
         const qrCodeData = await generateGuestQRCode(guestId, eventId, rsvpToken);
@@ -137,8 +257,10 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
         );
 
         createdGuests.push(createdGuest[0]);
+        console.log(`Guest ${i + 1} successfully added to response`);
 
       } catch (error) {
+        console.error(`Error creating guest ${i + 1}:`, error);
         errors.push({
           index: i,
           guest: guests[i],
@@ -146,6 +268,8 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
         });
       }
     }
+
+    console.log('Bulk creation completed:', { createdCount: createdGuests.length, errorCount: errors.length });
 
     res.status(201).json({
       success: true,
@@ -165,6 +289,21 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
   }
 });
 
+// Helper to parse XLSX buffer to guest objects
+function parseXLSXGuests(buffer) {
+  const workbook = XLSX.read(buffer, { type: 'buffer' });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  // Expect: first column = name, second column = phone
+  const guests = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row[0] || !row[1]) continue; // skip if missing name or phone
+    guests.push({ name: String(row[0]).trim(), phone: String(row[1]).trim() });
+  }
+  return guests;
+}
+
 // POST /api/guests/:eventId/upload-csv - Upload CSV file
 router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, upload.single('file'), async (req, res) => {
   try {
@@ -177,13 +316,35 @@ router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, uplo
       });
     }
 
+    let guests = [];
+    if (req.file.mimetype === 'text/csv' || req.file.mimetype === 'application/vnd.ms-excel') {
     const csvText = req.file.buffer.toString('utf-8');
-    const guests = parseCSVData(csvText);
+      guests = parseCSVData(csvText);
+    } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+      guests = parseXLSXGuests(req.file.buffer);
+    }
 
     if (guests.length === 0) {
       return res.status(400).json({
         error: true,
-        message: 'No valid guest data found in CSV'
+        message: 'No valid guest data found in file'
+      });
+    }
+
+    // Check for duplicate phone numbers
+    const phoneNumbers = guests.map(g => g.phone).filter(Boolean);
+    const duplicates = await checkDuplicatePhones(eventId, phoneNumbers);
+    
+    if (duplicates.length > 0) {
+      return res.status(400).json({
+        error: true,
+        message: 'Duplicate phone numbers found in file',
+        data: {
+          duplicates: duplicates.map(d => ({
+            phone: d.phone,
+            existingGuest: d.existingGuest.name
+          }))
+        }
       });
     }
 
@@ -207,8 +368,15 @@ router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, uplo
             special_requests, rsvp_token
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            guestId, eventId, guest.name, guest.email, formattedPhone,
-            guest.tableNumber, guest.guestCount || 1, guest.specialRequests, rsvpToken
+            guestId, 
+            eventId, 
+            guest.name, 
+            guest.email || null, 
+            formattedPhone || null,
+            guest.tableNumber || null, 
+            guest.guestCount || 1, 
+            guest.specialRequests || null, 
+            rsvpToken
           ]
         );
 

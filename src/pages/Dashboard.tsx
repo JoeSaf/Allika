@@ -4,8 +4,7 @@ import Header from '@/components/Header';
 import EventCreationModal from '@/components/EventCreationModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, MoreHorizontal, Calendar, MapPin, Users } from 'lucide-react';
-import { getEvents, deleteEvent, setCurrentEvent, Event } from '@/utils/storage';
+import { PlusCircle, MoreHorizontal, Calendar, MapPin, Users, Scan } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   DropdownMenu,
@@ -17,6 +16,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { isUserLoggedIn, requireLogin, getCurrentUser } from '@/utils/auth';
 import { toast } from '@/hooks/use-toast';
+import { apiService } from '@/services/api';
+
+interface Event {
+  id: string;
+  title: string;
+  type: string;
+  date: string;
+  time: string;
+  venue: string;
+  status: string;
+  guest_count: number;
+  checked_in_count: number;
+  created_at: string;
+}
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -44,12 +57,17 @@ const Dashboard = () => {
     loadEvents();
   }, [navigate]);
 
-  const loadEvents = () => {
+  const loadEvents = async () => {
     try {
-      console.log('Loading events from storage...');
-      const storedEvents = getEvents();
-      console.log('Loaded events:', storedEvents);
-      setEvents(storedEvents);
+      console.log('Loading events from API...');
+      const response = await apiService.getEvents();
+      if (response.success && response.data?.events) {
+        console.log('Loaded events:', response.data.events);
+        setEvents(response.data.events);
+      } else {
+        console.log('No events found or API error');
+        setEvents([]);
+      }
     } catch (error) {
       console.error('Error loading events:', error);
       toast({
@@ -78,10 +96,10 @@ const Dashboard = () => {
     setShowCreateModal(true);
   };
 
-  const handleDeleteEvent = (id: string) => {
+  const handleDeleteEvent = async (id: string) => {
     try {
-      deleteEvent(id);
-      loadEvents(); // Reload events after deletion
+      await apiService.deleteEvent(id);
+      await loadEvents(); // Reload events after deletion
       toast({
         title: "Event Deleted",
         description: "The event has been successfully deleted.",
@@ -98,7 +116,8 @@ const Dashboard = () => {
 
   const handleEditEvent = (id: string) => {
     try {
-      setCurrentEvent(id);
+      // Store the current event ID in localStorage for the template editor
+      localStorage.setItem('alika_current_event', id);
       navigate(`/template/${id}`);
     } catch (error) {
       console.error('Error setting current event:', error);
@@ -232,10 +251,17 @@ const Dashboard = () => {
                             Preview Messages
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            onClick={() => navigate('/view-analytics')} 
+                            onClick={() => navigate(`/analytics/${event.id}`)} 
                             className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer"
                           >
                             View Analytics
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => navigate(`/qr-scanner/${event.id}`)} 
+                            className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer"
+                          >
+                            <Scan className="w-4 h-4 mr-2" />
+                            QR Scanner
                           </DropdownMenuItem>
                           <DropdownMenuSeparator className="bg-slate-700" />
                           <DropdownMenuItem 

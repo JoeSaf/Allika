@@ -1,261 +1,331 @@
 
 import { useState, useEffect } from 'react';
-import Header from '@/components/Header';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, Users, MessageSquare, Eye, Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { getCurrentEvent, getEventAnalytics, updateAnalytics, Analytics } from '@/utils/storage';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { 
+  BarChart3, 
+  Users, 
+  CheckCircle, 
+  Clock, 
+  Mail, 
+  Phone, 
+  Plus, 
+  Search, 
+  Scan
+} from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  getEvent, 
+  getEventAnalytics, 
+  getGuests, 
+  addGuest, 
+  addGuestsBulk, 
+  sendInvites
+} from '@/services/api';
+import SendInvitationModal from '@/components/SendInvitationModal';
+
+interface Guest {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  checked_in?: boolean;
+  check_in_time?: string;
+  rsvp_status?: string;
+  guest_count?: number;
+  table_number?: string;
+}
+
+interface Event {
+  id: string;
+  title: string;
+  date: string;
+  venue: string;
+  description?: string;
+  theme?: string;
+  rsvp_enabled?: boolean;
+}
 
 const ViewAnalytics = () => {
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const [currentEvent, setCurrentEvent] = useState(null);
-  const [responseData, setResponseData] = useState([]);
-  const [statusData, setStatusData] = useState([]);
-  const [recentActivity, setRecentActivity] = useState([]);
+  const { eventId } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  const [event, setEvent] = useState<Event | null>(null);
+  const [guests, setGuests] = useState<Guest[]>([]);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAddGuestModal, setShowAddGuestModal] = useState(false);
+  const [showSendInvitationModal, setShowSendInvitationModal] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  
+
 
   useEffect(() => {
-    loadAnalyticsData();
-  }, []);
+    if (eventId) {
+      loadEventData();
+    }
+  }, [eventId]);
 
-  const loadAnalyticsData = () => {
-    const event = getCurrentEvent();
-    if (!event) return;
-
-    setCurrentEvent(event);
-    
-    // Update analytics for the current event
-    updateAnalytics(event);
-    
-    // Get updated analytics
-    const eventAnalytics = getEventAnalytics(event.id);
-    if (eventAnalytics) {
-      setAnalytics(eventAnalytics);
+  const loadEventData = async () => {
+    try {
+      setLoading(true);
       
-      // Generate response timeline data
-      const totalResponses = eventAnalytics.confirmed + eventAnalytics.declined;
-      setResponseData([
-        { name: 'Week 1', responses: Math.round(totalResponses * 0.2) },
-        { name: 'Week 2', responses: Math.round(totalResponses * 0.35) },
-        { name: 'Week 3', responses: Math.round(totalResponses * 0.25) },
-        { name: 'Week 4', responses: Math.round(totalResponses * 0.2) },
+      const [eventRes, guestsRes, analyticsRes] = await Promise.all([
+        getEvent(eventId!),
+        getGuests(eventId!),
+        getEventAnalytics(eventId!)
       ]);
 
-      // Status distribution
-      setStatusData([
-        { name: 'Confirmed', value: eventAnalytics.confirmed, color: '#10b981' },
-        { name: 'Pending', value: eventAnalytics.pending, color: '#f59e0b' },
-        { name: 'Declined', value: eventAnalytics.declined, color: '#ef4444' },
-      ]);
-
-      // Generate recent activity from guests
-      const recentGuests = event.guests
-        .filter(guest => guest.rsvpDate || guest.checkInTime)
-        .sort((a, b) => {
-          const dateA = new Date(a.rsvpDate || a.checkInTime || 0);
-          const dateB = new Date(b.rsvpDate || b.checkInTime || 0);
-          return dateB.getTime() - dateA.getTime();
-        })
-        .slice(0, 5)
-        .map(guest => ({
-          name: guest.name,
-          action: guest.checkedIn ? 'checked in' : 
-                  guest.status === 'confirmed' ? 'confirmed attendance' : 
-                  guest.status === 'declined' ? 'declined invitation' : 'viewed invitation',
-          time: guest.rsvpDate ? new Date(guest.rsvpDate).toLocaleDateString() : 
-                guest.checkInTime ? `Checked in at ${guest.checkInTime}` : 'Recently',
-          status: guest.status
-        }));
+      if (eventRes.success) setEvent(eventRes.data.event);
+      if (guestsRes.success) setGuests(guestsRes.data.guests);
+      if (analyticsRes.success) setAnalytics(analyticsRes.data);
       
-      setRecentActivity(recentGuests);
+    } catch (error) {
+      console.error('Error loading event data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load event data.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!currentEvent) {
+
+
+  const handleManualCheckIn = async (guestId: string) => {
+    setIsProcessing(true);
+    try {
+      // In a real app, you'd call the API to check in the guest
+      const guest = guests.find(g => g.id === guestId);
+      if (guest) {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Update local state
+        const updatedGuests = guests.map(g => 
+          g.id === guestId 
+            ? { ...g, checked_in: true, check_in_time: new Date().toLocaleTimeString() }
+            : g
+        );
+        setGuests(updatedGuests);
+        
+        toast({
+          title: "Guest Checked In",
+          description: `${guest.name} has been checked in successfully!`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to check in guest.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const filteredGuests = guests.filter(guest =>
+    guest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (guest.email && guest.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (guest.phone && guest.phone.includes(searchQuery))
+  );
+
+  const checkedInGuests = guests.filter(g => g.checked_in);
+  const pendingGuests = guests.filter(g => !g.checked_in);
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900">
-        <Header />
-        <div className="container mx-auto px-4 py-8 pt-24">
-          <Card className="bg-slate-800 border-slate-700">
-            <CardContent className="text-center py-12">
-              <AlertCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-slate-400 mb-2">No Event Selected</h3>
-              <p className="text-slate-500">Please select an event from the dashboard to view analytics.</p>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading analytics...</div>
       </div>
     );
   }
 
-  if (!analytics) {
+  if (!event) {
     return (
-      <div className="min-h-screen bg-slate-900">
-        <Header />
-        <div className="container mx-auto px-4 py-8 pt-24">
-          <Card className="bg-slate-800 border-slate-700">
-            <CardContent className="text-center py-12">
-              <BarChart3 className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-slate-400 mb-2">Loading Analytics...</h3>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-red-400 text-xl">Event not found.</div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-900">
-      <Header />
-      
-      <div className="container mx-auto px-4 py-8 pt-24">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Event Analytics</h1>
-          <p className="text-slate-300">Event: {currentEvent.title}</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2">{event.title}</h1>
+              <p className="text-slate-300">{event.date} • {event.venue}</p>
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={() => navigate(`/qr-scanner/${eventId}`)} className="bg-teal-600 hover:bg-teal-700">
+                <Scan className="w-4 h-4 mr-2" />
+                QR Scanner
+              </Button>
+              <Button onClick={() => setShowAddGuestModal(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Guest
+              </Button>
+              <Button onClick={() => setShowSendInvitationModal(true)} variant="outline">
+                <Mail className="w-4 h-4 mr-2" />
+                Send Invitations
+              </Button>
+            </div>
+          </div>
         </div>
 
-        {/* Overview Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="bg-slate-800 border-slate-700">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">Total Invitations</CardTitle>
-              <MessageSquare className="h-4 w-4 text-teal-400" />
+              <CardTitle className="text-sm font-medium text-slate-300">Total Guests</CardTitle>
+              <Users className="h-4 w-4 text-blue-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">{analytics.totalInvitations}</div>
+              <div className="text-2xl font-bold text-white">{guests.length}</div>
             </CardContent>
           </Card>
 
           <Card className="bg-slate-800 border-slate-700">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">Response Rate</CardTitle>
-              <BarChart3 className="h-4 w-4 text-teal-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{analytics.responseRate}%</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-800 border-slate-700">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">Views</CardTitle>
-              <Eye className="h-4 w-4 text-teal-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{analytics.read}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-800 border-slate-700">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">Confirmed</CardTitle>
+              <CardTitle className="text-sm font-medium text-slate-300">Checked In</CardTitle>
               <CheckCircle className="h-4 w-4 text-green-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">{analytics.confirmed}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <Card className="bg-slate-800 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-white">Response Timeline</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={responseData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-                  <XAxis dataKey="name" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#1e293b', 
-                      border: '1px solid #475569',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <Bar dataKey="responses" fill="#14b8a6" />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="text-2xl font-bold text-green-400">{checkedInGuests.length}</div>
             </CardContent>
           </Card>
 
           <Card className="bg-slate-800 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-white">Response Status</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-slate-300">Pending</CardTitle>
+              <Clock className="h-4 w-4 text-orange-400" />
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#1e293b', 
-                      border: '1px solid #475569',
-                      borderRadius: '8px'
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="text-2xl font-bold text-orange-400">{pendingGuests.length}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800 border-slate-700">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-slate-300">Attendance Rate</CardTitle>
+              <BarChart3 className="h-4 w-4 text-purple-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-400">
+                {guests.length > 0 ? Math.round((checkedInGuests.length / guests.length) * 100) : 0}%
+        </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Recent Activity */}
-        <Card className="bg-slate-800 border-slate-700">
+        {/* Guest Management */}
+        <Card className="bg-slate-800 border-slate-700 mb-8">
           <CardHeader>
-            <CardTitle className="text-white">Recent Activity</CardTitle>
+            <CardTitle className="text-white">Guest Management</CardTitle>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Input
+                placeholder="Search guests..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
           </CardHeader>
           <CardContent>
-            {recentActivity.length === 0 ? (
-              <div className="text-center py-8">
-                <Clock className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                <p className="text-slate-400">No recent activity</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recentActivity.map((activity, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center">
-                        <Users className="w-4 h-4 text-white" />
-                      </div>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {filteredGuests.map((guest) => (
+                <div key={guest.id} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
+                  <div className="flex items-center gap-4">
                       <div>
-                        <p className="text-white font-medium">{activity.name}</p>
-                        <p className="text-sm text-slate-300">{activity.action}</p>
+                      <p className="text-white font-medium">{guest.name}</p>
+                      <div className="flex items-center gap-4 text-sm text-slate-400">
+                        {guest.email && (
+                          <span className="flex items-center gap-1">
+                            <Mail className="w-3 h-3" />
+                            {guest.email}
+                          </span>
+                        )}
+                        {guest.phone && (
+                          <span className="flex items-center gap-1">
+                            <Phone className="w-3 h-3" />
+                            {guest.phone}
+                          </span>
+                        )}
+                        {guest.table_number && (
+                          <span>Table {guest.table_number}</span>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <Badge 
-                        className={
-                          activity.status === 'confirmed' ? 'bg-green-600' :
-                          activity.status === 'declined' ? 'bg-red-600' : 'bg-yellow-600'
-                        }
-                      >
-                        {activity.status}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {guest.checked_in ? (
+                      <Badge variant="secondary" className="bg-green-500/20 text-green-400">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Checked In
                       </Badge>
-                      <span className="text-sm text-slate-400">{activity.time}</span>
+                    ) : (
+                      <Button
+                        onClick={() => handleManualCheckIn(guest.id)}
+                        disabled={isProcessing}
+                        size="sm"
+                      >
+                        Check In
+                      </Button>
+                    )}
                     </div>
                   </div>
                 ))}
+              {filteredGuests.length === 0 && (
+                <p className="text-slate-400 text-center py-4">No guests found</p>
+              )}
               </div>
-            )}
           </CardContent>
         </Card>
+
+
+
+        {/* Add Guest Modal */}
+        <Dialog open={showAddGuestModal} onOpenChange={setShowAddGuestModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Guest</DialogTitle>
+            </DialogHeader>
+            {/* Add guest form would go here */}
+          </DialogContent>
+        </Dialog>
+
+        {/* Send Invitation Modal */}
+        <SendInvitationModal
+          open={showSendInvitationModal}
+          onClose={() => setShowSendInvitationModal(false)}
+          eventId={eventId!}
+          template={selectedTemplate}
+        />
       </div>
     </div>
   );

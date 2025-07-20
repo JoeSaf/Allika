@@ -48,6 +48,8 @@ echo "🎨 Starting frontend server..."
 npm run dev &
 FRONTEND_PID=$!
 
+# (Removed WhatsApp bulk sender background script startup)
+
 echo ""
 echo "🎉 Alika is starting up!"
 echo ""
@@ -63,6 +65,7 @@ cleanup() {
     echo "🛑 Stopping servers..."
     kill $BACKEND_PID 2>/dev/null
     kill $FRONTEND_PID 2>/dev/null
+    # (No WA_BULK_PID to kill)
     echo "✅ Servers stopped"
     exit 0
 }

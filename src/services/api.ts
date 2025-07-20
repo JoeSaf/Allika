@@ -169,16 +169,20 @@ class ApiService {
     invitationData: {
       coupleName?: string;
       eventDate?: string;
+      eventDateWords?: string;
       eventTime?: string;
       venue?: string;
       reception?: string;
       receptionTime?: string;
       theme?: string;
       rsvpContact?: string;
+      rsvpContactSecondary?: string;
       additionalInfo?: string;
       invitingFamily?: string;
       guestName?: string;
       invitationImage?: string;
+      dateLang?: string;
+      selectedTemplate?: string;
     }
   ): Promise<ApiResponse> {
     return this.request(`/events/${eventId}/invitation-data`, {
@@ -216,6 +220,7 @@ class ApiService {
       buttonColor?: string;
       accentColor?: string;
       rsvpContact?: string;
+      rsvpContactSecondary?: string;
     }
   ): Promise<ApiResponse> {
     return this.request(`/events/${eventId}/rsvp-settings`, {
@@ -344,6 +349,22 @@ class ApiService {
     }
 
     return response.blob();
+  }
+
+  async checkDuplicatePhones(
+    eventId: string,
+    phoneNumbers: string[]
+  ): Promise<ApiResponse<{
+    duplicates: Array<{
+      phone: string;
+      existingGuest: string;
+    }>;
+    hasDuplicates: boolean;
+  }>> {
+    return this.request(`/guests/${eventId}/check-duplicates`, {
+      method: 'POST',
+      body: JSON.stringify({ phoneNumbers }),
+    });
   }
 
   // RSVP endpoints (public)
@@ -585,3 +606,13 @@ export async function sendInvites(eventId: string, data: {
 }) {
   return apiService.sendInvites(eventId, data);
 } 
+
+export const addGuest = apiService.addGuest.bind(apiService);
+export const addGuestsBulk = apiService.addGuestsBulk.bind(apiService);
+export const getGuests = apiService.getGuests.bind(apiService);
+export const getEvent = apiService.getEvent.bind(apiService);
+export const getEventAnalytics = apiService.getEventAnalytics.bind(apiService);
+export const checkDuplicatePhones = apiService.checkDuplicatePhones.bind(apiService);
+export const checkInGuestQr = apiService.checkInGuestQr.bind(apiService);
+export const updateRsvpSettings = apiService.updateRsvpSettings.bind(apiService);
+export const createEvent = apiService.createEvent.bind(apiService); 

@@ -120,11 +120,6 @@ DB_PORT=3306
 JWT_SECRET=your_super_secret_jwt_key_here
 JWT_EXPIRES_IN=7d
 
-# Twilio Configuration (for SMS/WhatsApp)
-TWILIO_ACCOUNT_SID=your_twilio_account_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
-TWILIO_PHONE_NUMBER=your_twilio_phone_number
-
 # CORS Configuration
 FRONTEND_URL=http://localhost:5173
 ```
@@ -294,7 +289,6 @@ For support and questions:
 
 - [shadcn/ui](https://ui.shadcn.com/) for beautiful UI components
 - [Tailwind CSS](https://tailwindcss.com/) for styling
-- [Twilio](https://www.twilio.com/) for messaging integration
 - [QRCode](https://github.com/soldair/node-qrcode) for QR code generation
 
 ---

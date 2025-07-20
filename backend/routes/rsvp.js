@@ -3,6 +3,7 @@ import { getPool } from '../config/database.js';
 import { optionalAuth } from '../middleware/auth.js';
 import { validateRSVPResponse } from '../middleware/validation.js';
 import { formatDateTime } from '../utils/helpers.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
@@ -44,6 +45,18 @@ router.get('/:token', async (req, res) => {
       'SELECT * FROM rsvp_responses WHERE guest_id = ? ORDER BY created_at DESC LIMIT 1',
       [guest.id]
     );
+
+    // Fetch invitation data for the event
+    const [invitationRows] = await pool.execute(
+      'SELECT * FROM event_invitation_data WHERE event_id = ?',
+      [guest.event_id]
+    );
+    const invitationData = invitationRows[0] || {};
+
+    // Ensure camelCase for selectedTemplate
+    if (invitationData.selected_template) {
+      invitationData.selectedTemplate = invitationData.selected_template;
+    }
 
     const rsvpData = {
       guest: {
@@ -87,6 +100,7 @@ router.get('/:token', async (req, res) => {
         accentColor: guest.accent_color,
         rsvpContact: guest.rsvp_contact
       },
+      invitationData, // <-- include invitation data
       hasResponded: responses.length > 0,
       lastResponse: responses.length > 0 ? responses[0] : null
     };
@@ -144,7 +158,7 @@ router.post('/:token', validateRSVPResponse, async (req, res) => {
     }
 
     // Create RSVP response
-    const responseId = require('uuid').v4();
+    const responseId = uuidv4();
     await pool.execute(
       `INSERT INTO rsvp_responses (
         id, guest_id, event_id, response, guest_count, special_requests,

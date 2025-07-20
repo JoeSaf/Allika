@@ -83,11 +83,14 @@ const createTables = async () => {
         reception VARCHAR(500),
         reception_time TIME,
         theme VARCHAR(255),
-        rsvp_contact VARCHAR(255),
+        rsvp_contact VARCHAR(20),
+        rsvp_contact_secondary VARCHAR(20),
         additional_info TEXT,
         inviting_family VARCHAR(255),
         invitation_image VARCHAR(500),
+        date_lang VARCHAR(10) DEFAULT 'en',
         status ENUM('draft', 'active', 'completed') DEFAULT 'draft',
+        messages_sent INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -96,6 +99,33 @@ const createTables = async () => {
         INDEX idx_date (date)
       )
     `);
+    // Ensure date_lang column exists (for legacy DBs)
+    const [dateLangCol] = await connection.execute(`SHOW COLUMNS FROM events LIKE 'date_lang'`);
+    if (dateLangCol.length === 0) {
+      await connection.execute(`ALTER TABLE events ADD COLUMN date_lang VARCHAR(10) DEFAULT 'en'`);
+      console.log('✅ Added date_lang column to events table');
+    }
+
+    // Ensure messages_sent column exists (for legacy DBs)
+    const [columns] = await connection.execute(`SHOW COLUMNS FROM events LIKE 'messages_sent'`);
+    if (columns.length === 0) {
+      await connection.execute(`ALTER TABLE events ADD COLUMN messages_sent INT DEFAULT 0`);
+      console.log('✅ Added messages_sent column to events table');
+    }
+
+    // Ensure rsvp_contact_secondary column exists (for legacy DBs)
+    const [rsvpSecondaryCol] = await connection.execute(`SHOW COLUMNS FROM events LIKE 'rsvp_contact_secondary'`);
+    if (rsvpSecondaryCol.length === 0) {
+      await connection.execute(`ALTER TABLE events ADD COLUMN rsvp_contact_secondary VARCHAR(20)`);
+      console.log('✅ Added rsvp_contact_secondary column to events table');
+    }
+
+    // Update rsvp_contact field size to VARCHAR(20) for phone numbers (for legacy DBs)
+    const [rsvpContactCol] = await connection.execute(`SHOW COLUMNS FROM events LIKE 'rsvp_contact'`);
+    if (rsvpContactCol.length > 0 && rsvpContactCol[0].Type.toLowerCase() !== 'varchar(20)') {
+      await connection.execute(`ALTER TABLE events MODIFY rsvp_contact VARCHAR(20)`);
+      console.log('✅ Updated rsvp_contact column to VARCHAR(20) in events table');
+    }
 
     // Event invitation data table
     await connection.execute(`
@@ -104,22 +134,71 @@ const createTables = async () => {
         event_id VARCHAR(36) NOT NULL,
         couple_name VARCHAR(255),
         event_date VARCHAR(255),
+        event_date_words VARCHAR(255),
         event_time VARCHAR(50),
         venue VARCHAR(500),
         reception VARCHAR(500),
-        reception_time VARCHAR(50),
+        reception_time TIME,
         theme VARCHAR(255),
-        rsvp_contact VARCHAR(255),
+        rsvp_contact VARCHAR(20),
+        rsvp_contact_secondary VARCHAR(20),
         additional_info TEXT,
         inviting_family VARCHAR(255),
         guest_name VARCHAR(255),
-        invitation_image VARCHAR(500),
+        invitation_image MEDIUMTEXT,
+        selected_template VARCHAR(50) DEFAULT 'template1',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
         INDEX idx_event_id (event_id)
       )
     `);
+    // Ensure event_date_words column exists (for legacy DBs)
+    const [dateWordsCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'event_date_words'`);
+    if (dateWordsCol.length === 0) {
+      await connection.execute(`ALTER TABLE event_invitation_data ADD COLUMN event_date_words VARCHAR(255)`);
+      console.log('✅ Added event_date_words column to event_invitation_data table');
+    }
+    // Ensure invitation_image column is MEDIUMTEXT (for legacy DBs)
+    const [imgCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'invitation_image'`);
+    if (imgCol.length > 0 && imgCol[0].Type.toLowerCase() !== 'mediumtext') {
+      await connection.execute(`ALTER TABLE event_invitation_data MODIFY invitation_image MEDIUMTEXT`);
+      console.log('✅ Modified invitation_image column to MEDIUMTEXT in event_invitation_data table');
+    }
+    // Ensure selected_template column exists (for legacy DBs)
+    const [selTemplateCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'selected_template'`);
+    if (selTemplateCol.length === 0) {
+      await connection.execute(`ALTER TABLE event_invitation_data ADD COLUMN selected_template VARCHAR(50) DEFAULT 'template1'`);
+      console.log('✅ Added selected_template column to event_invitation_data table');
+    }
+
+    // Ensure rsvp_contact_secondary column exists (for legacy DBs)
+    const [invRsvpSecondaryCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'rsvp_contact_secondary'`);
+    if (invRsvpSecondaryCol.length === 0) {
+      await connection.execute(`ALTER TABLE event_invitation_data ADD COLUMN rsvp_contact_secondary VARCHAR(20)`);
+      console.log('✅ Added rsvp_contact_secondary column to event_invitation_data table');
+    }
+
+    // Update rsvp_contact field size to VARCHAR(20) for phone numbers (for legacy DBs)
+    const [invRsvpContactCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'rsvp_contact'`);
+    if (invRsvpContactCol.length > 0 && invRsvpContactCol[0].Type.toLowerCase() !== 'varchar(20)') {
+      await connection.execute(`ALTER TABLE event_invitation_data MODIFY rsvp_contact VARCHAR(20)`);
+      console.log('✅ Updated rsvp_contact column to VARCHAR(20) in event_invitation_data table');
+    }
+
+    // Update reception_time to TIME type (for legacy DBs)
+    const [receptionTimeCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'reception_time'`);
+    if (receptionTimeCol.length > 0 && receptionTimeCol[0].Type.toLowerCase() !== 'time') {
+      await connection.execute(`ALTER TABLE event_invitation_data MODIFY reception_time TIME`);
+      console.log('✅ Updated reception_time column to TIME in event_invitation_data table');
+    }
+
+    // Ensure date_lang column exists (for legacy DBs)
+    const [invDateLangCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'date_lang'`);
+    if (invDateLangCol.length === 0) {
+      await connection.execute(`ALTER TABLE event_invitation_data ADD COLUMN date_lang VARCHAR(10) DEFAULT 'en'`);
+      console.log('✅ Added date_lang column to event_invitation_data table');
+    }
 
     // RSVP settings table
     await connection.execute(`
@@ -145,13 +224,28 @@ const createTables = async () => {
         text_color VARCHAR(7),
         button_color VARCHAR(7),
         accent_color VARCHAR(7),
-        rsvp_contact VARCHAR(255),
+        rsvp_contact VARCHAR(20),
+        rsvp_contact_secondary VARCHAR(20),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
         INDEX idx_event_id (event_id)
       )
     `);
+
+    // Ensure rsvp_contact_secondary column exists in rsvp_settings (for legacy DBs)
+    const [rsvpSettingsSecondaryCol] = await connection.execute(`SHOW COLUMNS FROM rsvp_settings LIKE 'rsvp_contact_secondary'`);
+    if (rsvpSettingsSecondaryCol.length === 0) {
+      await connection.execute(`ALTER TABLE rsvp_settings ADD COLUMN rsvp_contact_secondary VARCHAR(20)`);
+      console.log('✅ Added rsvp_contact_secondary column to rsvp_settings table');
+    }
+
+    // Update rsvp_contact field size to VARCHAR(20) for phone numbers in rsvp_settings (for legacy DBs)
+    const [rsvpSettingsContactCol] = await connection.execute(`SHOW COLUMNS FROM rsvp_settings LIKE 'rsvp_contact'`);
+    if (rsvpSettingsContactCol.length > 0 && rsvpSettingsContactCol[0].Type.toLowerCase() !== 'varchar(20)') {
+      await connection.execute(`ALTER TABLE rsvp_settings MODIFY rsvp_contact VARCHAR(20)`);
+      console.log('✅ Updated rsvp_contact column to VARCHAR(20) in rsvp_settings table');
+    }
 
     // Guests table
     await connection.execute(`
@@ -219,57 +313,8 @@ const createTables = async () => {
         INDEX idx_check_in_time (check_in_time)
       )
     `);
-
-    // Analytics table
-    await connection.execute(`
-      CREATE TABLE IF NOT EXISTS analytics (
-        id VARCHAR(36) PRIMARY KEY,
-        event_id VARCHAR(36) NOT NULL,
-        total_invitations INT DEFAULT 0,
-        messages_sent INT DEFAULT 0,
-        delivered INT DEFAULT 0,
-        \`read\` INT DEFAULT 0,
-        responded INT DEFAULT 0,
-        confirmed INT DEFAULT 0,
-        declined INT DEFAULT 0,
-        pending INT DEFAULT 0,
-        response_rate DECIMAL(5,2) DEFAULT 0.00,
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
-        INDEX idx_event_id (event_id)
-      )
-    `);
-
-    // Message logs table
-    await connection.execute(`
-      CREATE TABLE IF NOT EXISTS message_logs (
-        id VARCHAR(36) PRIMARY KEY,
-        event_id VARCHAR(36) NOT NULL,
-        guest_id VARCHAR(36),
-        message_type ENUM('sms', 'whatsapp', 'email') NOT NULL,
-        recipient VARCHAR(255) NOT NULL,
-        message_content TEXT NOT NULL,
-        status ENUM('pending', 'sent', 'delivered', 'failed') DEFAULT 'pending',
-        sent_at TIMESTAMP NULL,
-        delivered_at TIMESTAMP NULL,
-        error_message TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
-        FOREIGN KEY (guest_id) REFERENCES guests(id) ON DELETE SET NULL,
-        INDEX idx_event_id (event_id),
-        INDEX idx_guest_id (guest_id),
-        INDEX idx_status (status),
-        INDEX idx_sent_at (sent_at)
-      )
-    `);
-
-    connection.release();
-    console.log('✅ Database tables created successfully');
-    
   } catch (error) {
     console.error('❌ Error creating tables:', error);
-    throw error;
+    process.exit(1);
   }
 };
-
-export default pool; 

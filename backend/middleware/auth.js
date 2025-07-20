@@ -88,8 +88,17 @@ export const optionalAuth = async (req, res, next) => {
 
 export const requireEventOwnership = async (req, res, next) => {
   try {
-    const { eventId } = req.params;
+    // Support both :id and :eventId param names
+    const eventId = req.params.eventId || req.params.id;
+    if (!eventId) {
+      return res.status(400).json({
+        error: true,
+        message: 'Event ID is required.'
+      });
+    }
     const userId = req.user.id;
+
+    console.log('Checking event ownership:', { eventId, userId });
 
     const pool = getPool();
     const [events] = await pool.execute(
@@ -98,12 +107,14 @@ export const requireEventOwnership = async (req, res, next) => {
     );
 
     if (events.length === 0) {
+      console.log('Event ownership check failed:', { eventId, userId });
       return res.status(403).json({
         error: true,
         message: 'Access denied. You do not own this event.'
       });
     }
 
+    console.log('Event ownership check passed:', { eventId, userId });
     next();
   } catch (error) {
     console.error('Event ownership check error:', error);

@@ -85,8 +85,13 @@ export const validateCreateEvent = [
   body('rsvpContact')
     .optional()
     .trim()
-    .isLength({ max: 255 })
-    .withMessage('RSVP contact must be less than 255 characters'),
+    .matches(/^\+\d{1,3}\d{9}$/)
+    .withMessage('RSVP contact must be a valid phone number with country code and 9 digits (e.g., +255692308579)'),
+  body('rsvpContactSecondary')
+    .optional()
+    .trim()
+    .matches(/^\+\d{1,3}\d{9}$/)
+    .withMessage('Secondary RSVP contact must be a valid phone number with country code and 9 digits (e.g., +255692308579)'),
   body('additionalInfo')
     .optional()
     .trim()
@@ -97,6 +102,11 @@ export const validateCreateEvent = [
     .trim()
     .isLength({ max: 255 })
     .withMessage('Inviting family must be less than 255 characters'),
+  body('dateLang')
+    .optional()
+    .isString()
+    .isLength({ max: 10 })
+    .withMessage('Date language must be a string up to 10 characters'),
   handleValidationErrors
 ];
 
@@ -146,8 +156,8 @@ export const validateCreateGuest = [
     .withMessage('Please provide a valid email address'),
   body('phone')
     .optional()
-    .isMobilePhone()
-    .withMessage('Please provide a valid phone number'),
+    .matches(/^\+\d{1,3}\d{9}$/)
+    .withMessage('Phone must be a valid phone number with country code and 9 digits (e.g., +255692308579)'),
   body('tableNumber')
     .optional()
     .trim()
@@ -180,8 +190,8 @@ export const validateBulkGuestUpload = [
     .withMessage('Each guest must have a valid email address'),
   body('guests.*.phone')
     .optional()
-    .isMobilePhone()
-    .withMessage('Each guest must have a valid phone number'),
+    .matches(/^\+\d{1,3}\d{9}$/)
+    .withMessage('Each guest phone must be a valid phone number with country code and 9 digits (e.g., +255692308579)'),
   handleValidationErrors
 ];
 

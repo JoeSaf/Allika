@@ -5,25 +5,65 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { createDefaultEvent, saveEvent, setCurrentEvent } from '@/utils/storage';
+import { createEvent, updateRsvpSettings } from '@/services/api';
 import { toast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { enUS } from 'date-fns/locale';
+import { Locale } from 'date-fns';
+
+let swLocale: Locale | undefined = undefined;
+try {
+  // Try to import Swahili locale if available
+  // @ts-ignore
+  swLocale = require('date-fns/locale/sw');
+} catch {}
+
 
 interface EventCreationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+// Utility to remove undefined values from an object
+function cleanPayload(obj: any) {
+  return Object.fromEntries(Object.entries(obj).filter(([_, v]) => v !== undefined));
+}
+
+// Define formData type to include all fields
+interface EventFormData {
+  name: string;
+  type: string;
+  description: string;
+  venue: string;
+  date: string;
+  invitingFamily: string;
+  reception: string;
+  receptionTime: string;
+  theme: string;
+  rsvpContact: string;
+  rsvpContactSecondary: string;
+}
+
 const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<EventFormData>({
     name: '',
     type: 'wedding',
     description: '',
     venue: '',
     date: '',
-    time: ''
+    invitingFamily: '',
+    reception: '',
+    receptionTime: '',
+    theme: '',
+    rsvpContact: '',
+    rsvpContactSecondary: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dateLang, setDateLang] = useState<'en' | 'sw'>('en');
+  const phoneRegex = /^\+\d{1,3}\d{9}$/;
+  const [rsvpContactError, setRsvpContactError] = useState('');
+  const [rsvpContactSecondaryError, setRsvpContactSecondaryError] = useState('');
 
   const eventTypes = [
     { value: 'wedding', label: 'Wedding' },
@@ -45,6 +85,12 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
       ...prev,
       [name]: value
     }));
+    if (name === 'rsvpContact') {
+      setRsvpContactError(value && !phoneRegex.test(value) ? 'Invalid phone. Use +countrycode and 9 digits.' : '');
+    }
+    if (name === 'rsvpContactSecondary') {
+      setRsvpContactSecondaryError(value && !phoneRegex.test(value) ? 'Invalid phone. Use +countrycode and 9 digits.' : '');
+    }
   };
 
   const handleTypeChange = (value: string) => {
@@ -61,7 +107,12 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
       description: '',
       venue: '',
       date: '',
-      time: ''
+      invitingFamily: '',
+      reception: '',
+      receptionTime: '',
+      theme: '',
+      rsvpContact: '',
+      rsvpContactSecondary: ''
     });
   };
 
@@ -80,87 +131,40 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
     setIsSubmitting(true);
 
     try {
-      // Create new event with proper data
-      const newEvent = createDefaultEvent(formData.type);
-      newEvent.title = formData.name.trim();
-      newEvent.additionalInfo = formData.description;
-      newEvent.venue = formData.venue;
-      newEvent.date = formData.date;
-      newEvent.time = formData.time;
+      // 1. Create event via backend
+      const eventPayload = cleanPayload({
+        title: formData.name.trim(),
+        type: formData.type,
+        date: formData.date ? new Date(formData.date).toISOString().slice(0, 10) : '',
+        venue: formData.venue || null,
+        reception: formData.reception || null,
+        theme: formData.theme || null,
+        rsvpContact: formData.rsvpContact || null,
+        rsvpContactSecondary: formData.rsvpContactSecondary || null,
+        additionalInfo: formData.description || null,
+        invitingFamily: formData.invitingFamily || null,
+        ...(formData.receptionTime ? { receptionTime: formData.receptionTime.slice(0, 5) } : {}),
+        dateLang: dateLang
+      });
+      const res = await createEvent(eventPayload);
+      if (!res || !res.data || !res.data.event) throw new Error('Event creation failed');
+      const newEvent = res.data.event;
       
-      // Customize RSVP settings based on event type
-      switch (formData.type) {
-        case 'wedding':
-          newEvent.rsvpSettings.title = `${formData.name} - Wedding Invitation`;
-          newEvent.rsvpSettings.subtitle = 'Join us in celebration of our special day';
-          newEvent.rsvpSettings.welcomeMessage = 'We would be honored by your presence at our wedding';
-          break;
-        case 'birthday':
-          newEvent.rsvpSettings.title = `${formData.name} - Birthday Party`;
-          newEvent.rsvpSettings.subtitle = 'Come celebrate with us!';
-          newEvent.rsvpSettings.welcomeMessage = 'Join us for an amazing birthday celebration';
-          break;
-        case 'anniversary':
-          newEvent.rsvpSettings.title = `${formData.name} - Anniversary Celebration`;
-          newEvent.rsvpSettings.subtitle = 'Celebrating years of love and happiness';
-          newEvent.rsvpSettings.welcomeMessage = 'Join us as we celebrate this special milestone';
-          break;
-        case 'graduation':
-          newEvent.rsvpSettings.title = `${formData.name} - Graduation Ceremony`;
-          newEvent.rsvpSettings.subtitle = 'Celebrating academic achievement';
-          newEvent.rsvpSettings.welcomeMessage = 'Join us in celebrating this academic milestone';
-          break;
-        case 'corporate':
-        case 'conference':
-        case 'meeting':
-        case 'seminar':
-          newEvent.rsvpSettings.title = formData.name;
-          newEvent.rsvpSettings.subtitle = 'Professional gathering';
-          newEvent.rsvpSettings.welcomeMessage = `You are invited to ${formData.name}`;
-          newEvent.rsvpSettings.guestCountEnabled = false;
-          break;
-        case 'awards':
-          newEvent.rsvpSettings.title = `${formData.name} - Awards Ceremony`;
-          newEvent.rsvpSettings.subtitle = 'An evening of recognition and celebration';
-          newEvent.rsvpSettings.welcomeMessage = 'You are cordially invited to our awards ceremony';
-          newEvent.rsvpSettings.guestCountEnabled = false;
-          newEvent.rsvpSettings.specialRequestsEnabled = false;
-          break;
-        case 'festival':
-          newEvent.rsvpSettings.title = `${formData.name} - Festival`;
-          newEvent.rsvpSettings.subtitle = 'Join us for a celebration';
-          newEvent.rsvpSettings.welcomeMessage = 'Come and enjoy the festivities with us';
-          break;
-        default:
-          newEvent.rsvpSettings.title = formData.name;
-          newEvent.rsvpSettings.subtitle = 'Join us for this special event';
-          newEvent.rsvpSettings.welcomeMessage = 'We would be delighted to have you join us';
-      }
+      console.log('Event created successfully:', { eventId: newEvent.id, title: newEvent.title });
       
-      // Set location in RSVP settings
-      if (formData.venue) {
-        newEvent.rsvpSettings.location = formData.venue;
-      }
-      
-      // Save the event and set it as current
-      console.log('Saving new event:', newEvent);
-      saveEvent(newEvent);
-      setCurrentEvent(newEvent.id);
-      
+      // Note: RSVP settings are already created by the backend with appropriate defaults
+      // Users can customize them later in the template editor if needed
+      // Store the current event ID in localStorage for the template editor
+      localStorage.setItem('alika_current_event', newEvent.id);
       toast({
         title: "Event Created!",
         description: `Your ${formData.type} event "${formData.name}" has been created successfully.`,
       });
-      
-      // Reset form and close modal
       resetForm();
       onOpenChange(false);
-      
-      // Small delay to ensure state updates
       setTimeout(() => {
-        navigate(`/template/${newEvent.id}`);
+        navigate('/dashboard');
       }, 100);
-      
     } catch (error) {
       console.error('Error creating event:', error);
       toast({
@@ -177,12 +181,17 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
     if (!isSubmitting) {
       resetForm();
       onOpenChange(false);
+      toast({
+        title: 'Event Creation Cancelled',
+        description: 'You have exited event creation.',
+        variant: 'default'
+      });
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
+      <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white text-xl">Create New Event</DialogTitle>
           <DialogDescription>
@@ -197,7 +206,7 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
               id="name"
               name="name"
               type="text"
-              placeholder="e.g., Sarah & John's Wedding"
+              placeholder="e.g., John & Doe's Wedding"
               value={formData.name}
               onChange={handleInputChange}
               className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
@@ -248,20 +257,31 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
                 className="bg-slate-700 border-slate-600 text-white"
                 disabled={isSubmitting}
               />
+              {/* Language selector for date */}
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-slate-400">Display date in:</span>
+                <Select value={dateLang} onValueChange={(val) => setDateLang(val as 'en' | 'sw')}>
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-7 w-20 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-700 border-slate-600 text-xs">
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="sw">Swahili</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Friendly date preview */}
+              {formData.date && (
+                <div className="text-xs text-slate-400 mt-1">
+                  {new Date(formData.date).toLocaleDateString(
+                    dateLang === 'sw' ? 'sw-TZ' : 'en-US',
+                    { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
+                  )}
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="time" className="text-slate-300">Time</Label>
-              <Input
-                id="time"
-                name="time"
-                type="time"
-                value={formData.time}
-                onChange={handleInputChange}
-                className="bg-slate-700 border-slate-600 text-white"
-                disabled={isSubmitting}
-              />
-            </div>
+            {/* Remove the Event Time input from the form UI */}
           </div>
 
           <div className="space-y-2">
@@ -276,6 +296,50 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
               className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
               disabled={isSubmitting}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="invitingFamily" className="text-slate-300">Inviting Family</Label>
+            <Input
+              id="invitingFamily"
+              name="invitingFamily"
+              type="text"
+              placeholder="e.g., MR. & MRS. JOHN DOE"
+              value={formData.invitingFamily}
+              onChange={handleInputChange}
+              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="rsvpContact" className="text-slate-300">RSVP Contact (Phone Number)</Label>
+            <Input
+              id="rsvpContact"
+              name="rsvpContact"
+              type="tel"
+              placeholder="e.g., +255 123 456 789"
+              value={formData.rsvpContact}
+              onChange={handleInputChange}
+              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+              disabled={isSubmitting}
+            />
+            {rsvpContactError && <div className="text-red-400 text-xs mt-1">{rsvpContactError}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="rsvpContactSecondary" className="text-slate-300">Secondary RSVP Contact (Phone Number)</Label>
+            <Input
+              id="rsvpContactSecondary"
+              name="rsvpContactSecondary"
+              type="tel"
+              placeholder="e.g., +255 987 654 321"
+              value={formData.rsvpContactSecondary}
+              onChange={handleInputChange}
+              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+              disabled={isSubmitting}
+            />
+            {rsvpContactSecondaryError && <div className="text-red-400 text-xs mt-1">{rsvpContactSecondaryError}</div>}
           </div>
 
           <div className="flex gap-3 pt-4">

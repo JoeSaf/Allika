@@ -246,3 +246,95 @@ export const retry = async (fn, maxRetries = 3, delay = 1000) => {
     }
   }
 }; 
+
+// Helper function to format time in words based on language
+export const formatTimeInWords = (timeString, language = 'en') => {
+  if (!timeString) return '';
+  
+  try {
+    // Parse time string (HH:MM format)
+    const [hours, minutes] = timeString.split(':').map(Number);
+    
+    if (isNaN(hours) || isNaN(minutes)) return timeString;
+    
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    
+    if (language === 'sw') {
+      // Swahili time format
+      const hour = date.getHours();
+      const minute = date.getMinutes();
+      
+      // Swahili time words
+      const swahiliHours = [
+        'saa sita', 'saa moja', 'saa mbili', 'saa tatu', 'saa nne', 'saa tano',
+        'saa sita', 'saa saba', 'saa nane', 'saa tisa', 'saa kumi', 'saa kumi na moja',
+        'saa sita', 'saa moja', 'saa mbili', 'saa tatu', 'saa nne', 'saa tano',
+        'saa sita', 'saa saba', 'saa nane', 'saa tisa', 'saa kumi', 'saa kumi na moja'
+      ];
+      
+      const swahiliMinutes = [
+        'saa kamili', 'dakika tano', 'dakika kumi', 'dakika kumi na tano', 'dakika ishirini',
+        'dakika ishirini na tano', 'dakika thelathini', 'dakika thelathini na tano',
+        'dakika arobaini', 'dakika arobaini na tano', 'dakika hamsini', 'dakika hamsini na tano'
+      ];
+      
+      let timeInWords = swahiliHours[hour];
+      
+      if (minute > 0) {
+        if (minute <= 30) {
+          timeInWords += ` na ${swahiliMinutes[Math.floor(minute / 5)]}`;
+        } else {
+          const remainingMinutes = 60 - minute;
+          const nextHour = (hour + 1) % 24;
+          timeInWords = swahiliHours[nextHour] + ` kasoro ${swahiliMinutes[Math.floor(remainingMinutes / 5)]}`;
+        }
+      }
+      
+      return timeInWords;
+    } else {
+      // English time format
+      return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+  } catch (error) {
+    console.error('Error formatting time in words:', error);
+    return timeString; // Return original if formatting fails
+  }
+};
+
+// Helper function to format date in words based on language
+export const formatDateInWords = (dateString, language = 'en') => {
+  if (!dateString) return '';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    
+    if (language === 'sw') {
+      // Swahili date format
+      const options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      };
+      return date.toLocaleDateString('sw-TZ', options);
+    } else {
+      // English date format
+      const options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      };
+      return date.toLocaleDateString('en-US', options);
+    }
+  } catch (error) {
+    console.error('Error formatting date in words:', error);
+    return dateString; // Return original if formatting fails
+  }
+}; 

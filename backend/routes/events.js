@@ -19,12 +19,14 @@ router.post('/', validateCreateEvent, async (req, res) => {
       date,
       time,
       venue,
+      additionalInfo,
+      invitingFamily,
       reception,
       receptionTime,
       theme,
       rsvpContact,
-      additionalInfo,
-      invitingFamily
+      rsvpContactSecondary,
+      dateLang
     } = req.body;
 
     const pool = getPool();
@@ -33,39 +35,108 @@ router.post('/', validateCreateEvent, async (req, res) => {
     // Create event
     await pool.execute(
       `INSERT INTO events (
-        id, user_id, title, type, date, time, venue, reception, 
-        reception_time, theme, rsvp_contact, additional_info, inviting_family
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, user_id, title, type, date, time, venue, additional_info, inviting_family, reception, reception_time, theme, rsvp_contact, rsvp_contact_secondary, date_lang
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        eventId, userId, title, type, date, time, venue, reception,
-        receptionTime, theme, rsvpContact, additionalInfo, invitingFamily
+        eventId, userId,
+        title ?? null, type ?? null, date ?? null, time ?? null, venue ?? null, additionalInfo ?? null,
+        invitingFamily ?? null, reception ?? null, receptionTime ?? null, theme ?? null, rsvpContact ?? null, rsvpContactSecondary ?? null, dateLang ?? 'en'
       ]
     );
 
-    // Create default RSVP settings
+    // Verify event was created
+    const [events] = await pool.execute(
+      `SELECT * FROM events WHERE id = ?`,
+      [eventId]
+    );
+
+    if (!events.length) {
+      console.error('Event insert failed, event not found:', eventId);
+      return res.status(500).json({
+        error: true,
+        message: 'Event creation failed (not found after insert)'
+      });
+    }
+
+    console.log('Event created successfully:', { eventId, userId, title });
+
+    // Create default RSVP settings based on event type
     const rsvpSettingsId = generateId();
+    let rsvpTitle = title;
+    let rsvpSubtitle = 'Join us for this special event';
+    let rsvpWelcomeMessage = 'We would be delighted to have you join us';
+    let guestCountEnabled = true;
+    let specialRequestsEnabled = true;
+    
+    // Customize RSVP settings based on event type
+    switch (type) {
+      case 'wedding':
+        rsvpTitle = `${title} - Wedding Invitation`;
+        rsvpSubtitle = 'Join us in celebration of our special day';
+        rsvpWelcomeMessage = 'We would be honored by your presence at our wedding';
+        break;
+      case 'birthday':
+        rsvpTitle = `${title} - Birthday Party`;
+        rsvpSubtitle = 'Come celebrate with us!';
+        rsvpWelcomeMessage = 'Join us for an amazing birthday celebration';
+        break;
+      case 'anniversary':
+        rsvpTitle = `${title} - Anniversary Celebration`;
+        rsvpSubtitle = 'Celebrating years of love and happiness';
+        rsvpWelcomeMessage = 'Join us as we celebrate this special milestone';
+        break;
+      case 'graduation':
+        rsvpTitle = `${title} - Graduation Ceremony`;
+        rsvpSubtitle = 'Celebrating academic achievement';
+        rsvpWelcomeMessage = 'Join us in celebrating this academic milestone';
+        break;
+      case 'corporate':
+      case 'conference':
+      case 'meeting':
+      case 'seminar':
+        rsvpTitle = title;
+        rsvpSubtitle = 'Professional gathering';
+        rsvpWelcomeMessage = `You are invited to ${title}`;
+        guestCountEnabled = false;
+        break;
+      case 'awards':
+        rsvpTitle = `${title} - Awards Ceremony`;
+        rsvpSubtitle = 'An evening of recognition and celebration';
+        rsvpWelcomeMessage = 'You are cordially invited to our awards ceremony';
+        guestCountEnabled = false;
+        specialRequestsEnabled = false;
+        break;
+      case 'festival':
+        rsvpTitle = `${title} - Festival`;
+        rsvpSubtitle = 'Join us for a celebration';
+        rsvpWelcomeMessage = 'Come and enjoy the festivities with us';
+        break;
+    }
+    
     await pool.execute(
       `INSERT INTO rsvp_settings (
         id, event_id, title, subtitle, location, welcome_message,
         confirm_text, decline_text, guest_count_enabled, guest_count_label,
         guest_count_options, special_requests_enabled, special_requests_label,
         special_requests_placeholder, submit_button_text, thank_you_message,
-        background_color, text_color, button_color, accent_color
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        background_color, text_color, button_color, accent_color,
+        rsvp_contact, rsvp_contact_secondary
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        rsvpSettingsId, eventId, title, 'Join us for this special event',
-        venue || '', 'We would be delighted to have you join us',
-        'Yes, I\'ll be there', 'Sorry, can\'t make it', true, 'Number of guests',
+        rsvpSettingsId, eventId, rsvpTitle, rsvpSubtitle,
+        venue || '', rsvpWelcomeMessage,
+        'Yes, I\'ll be there', 'Sorry, can\'t make it', guestCountEnabled, 'Number of guests',
         JSON.stringify(['1 person', '2 people', '3 people', '4+ people']),
-        true, 'Special requests or dietary restrictions',
+        specialRequestsEnabled, 'Special requests or dietary restrictions',
         'Let us know if you have any special requirements...',
         'Submit RSVP', 'Thank you for your response! We look forward to celebrating with you.',
-        '#334155', '#ffffff', '#0d9488', '#14b8a6'
+        '#334155', '#ffffff', '#0d9488', '#14b8a6',
+        rsvpContact || null, rsvpContactSecondary || null
       ]
     );
 
     // Get created event with RSVP settings
-    const [events] = await pool.execute(
+    const [finalEvents] = await pool.execute(
       `SELECT e.*, rs.* FROM events e
        LEFT JOIN rsvp_settings rs ON e.id = rs.event_id
        WHERE e.id = ?`,
@@ -76,7 +147,7 @@ router.post('/', validateCreateEvent, async (req, res) => {
       success: true,
       message: 'Event created successfully',
       data: {
-        event: events[0]
+        event: finalEvents[0]
       }
     });
 
@@ -122,7 +193,7 @@ router.get('/', validatePagination, async (req, res) => {
     // Get total count
     const countQuery = query.replace(/SELECT.*FROM/, 'SELECT COUNT(DISTINCT e.id) as total FROM');
     const [countResult] = await pool.execute(countQuery, params);
-    const total = countResult[0].total;
+    const total = (countResult && countResult[0] && typeof countResult[0].total !== 'undefined') ? countResult[0].total : 0;
 
     // Get pagination info
     const pagination = getPaginationInfo(page, limit, total);
@@ -158,9 +229,9 @@ router.get('/:id', validateUUID, requireEventOwnership, async (req, res) => {
 
     // Get event with all related data
     const [events] = await pool.execute(
-      `SELECT e.*, 
-              rs.*,
-              eid.*,
+      `SELECT e.id, e.user_id, e.title, e.type, e.date, e.time, e.venue, e.reception, e.reception_time, e.theme, e.rsvp_contact, e.additional_info, e.inviting_family, e.status, e.created_at, e.updated_at, e.date_lang,
+              rs.id as rsvp_id, rs.title as rsvp_title, rs.subtitle as rsvp_subtitle, rs.location as rsvp_location, rs.welcome_message, rs.confirm_text, rs.decline_text, rs.guest_count_enabled, rs.guest_count_label, rs.guest_count_options, rs.special_requests_enabled, rs.special_requests_label, rs.special_requests_placeholder, rs.additional_fields, rs.submit_button_text, rs.thank_you_message, rs.background_color, rs.text_color, rs.button_color, rs.accent_color, rs.rsvp_contact as rsvp_contact_info,
+              eid.id as invitation_id, eid.couple_name, eid.event_date, eid.event_date_words, eid.event_time as invitation_time, eid.venue as invitation_venue, eid.reception as invitation_reception, eid.reception_time as invitation_reception_time, eid.theme as invitation_theme, eid.rsvp_contact as invitation_rsvp_contact, eid.additional_info as invitation_additional_info, eid.inviting_family as invitation_inviting_family, eid.guest_name, eid.invitation_image, eid.selected_template,
               COUNT(g.id) as guest_count,
               COUNT(CASE WHEN g.checked_in = 1 THEN 1 END) as checked_in_count,
               COUNT(CASE WHEN g.status = 'confirmed' THEN 1 END) as confirmed_count,
@@ -191,6 +262,13 @@ router.get('/:id', validateUUID, requireEventOwnership, async (req, res) => {
     const event = events[0];
     event.guests = guests;
 
+    // Set headers to prevent caching
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    
     res.json({
       success: true,
       data: {
@@ -220,7 +298,7 @@ router.put('/:id', validateUUID, requireEventOwnership, validateUpdateEvent, asy
 
     const allowedFields = [
       'title', 'type', 'date', 'time', 'venue', 'reception', 'reception_time',
-      'theme', 'rsvp_contact', 'additional_info', 'inviting_family', 'status'
+      'theme', 'rsvp_contact', 'rsvp_contact_secondary', 'additional_info', 'inviting_family', 'status'
     ];
 
     allowedFields.forEach(field => {
@@ -321,16 +399,17 @@ router.post('/:id/invitation-data', validateUUID, requireEventOwnership, async (
       // Update existing
       await pool.execute(
         `UPDATE event_invitation_data SET
-         couple_name = ?, event_date = ?, event_time = ?, venue = ?,
-         reception = ?, reception_time = ?, theme = ?, rsvp_contact = ?,
+         couple_name = ?, event_date = ?, event_date_words = ?, event_time = ?, venue = ?,
+         reception = ?, reception_time = ?, theme = ?, rsvp_contact = ?, rsvp_contact_secondary = ?,
          additional_info = ?, inviting_family = ?, guest_name = ?,
-         invitation_image = ?, updated_at = CURRENT_TIMESTAMP
+         invitation_image = ?, selected_template = ?, date_lang = ?, updated_at = CURRENT_TIMESTAMP
          WHERE event_id = ?`,
         [
-          invitationData.coupleName, invitationData.eventDate, invitationData.eventTime,
-          invitationData.venue, invitationData.reception, invitationData.receptionTime,
-          invitationData.theme, invitationData.rsvpContact, invitationData.additionalInfo,
-          invitationData.invitingFamily, invitationData.guestName, invitationData.invitationImage,
+          invitationData.coupleName || null, invitationData.eventDate || null, invitationData.eventDateWords || null, invitationData.eventTime || null,
+          invitationData.venue || null, invitationData.reception || null, invitationData.receptionTime || null,
+          invitationData.theme || null, invitationData.rsvpContact || null, invitationData.rsvpContactSecondary || null, invitationData.additionalInfo || null,
+          invitationData.invitingFamily || null, invitationData.guestName || null, invitationData.invitationImage || null,
+          invitationData.selectedTemplate || 'template1', invitationData.dateLang || 'en',
           id
         ]
       );
@@ -339,16 +418,17 @@ router.post('/:id/invitation-data', validateUUID, requireEventOwnership, async (
       const invitationId = generateId();
       await pool.execute(
         `INSERT INTO event_invitation_data (
-          id, event_id, couple_name, event_date, event_time, venue,
-          reception, reception_time, theme, rsvp_contact, additional_info,
-          inviting_family, guest_name, invitation_image
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          id, event_id, couple_name, event_date, event_date_words, event_time, venue,
+          reception, reception_time, theme, rsvp_contact, rsvp_contact_secondary, additional_info,
+          inviting_family, guest_name, invitation_image, selected_template, date_lang
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          invitationId, id, invitationData.coupleName, invitationData.eventDate,
-          invitationData.eventTime, invitationData.venue, invitationData.reception,
-          invitationData.receptionTime, invitationData.theme, invitationData.rsvpContact,
-          invitationData.additionalInfo, invitationData.invitingFamily,
-          invitationData.guestName, invitationData.invitationImage
+          invitationId, id, invitationData.coupleName || null, invitationData.eventDate || null, invitationData.eventDateWords || null,
+          invitationData.eventTime || null, invitationData.venue || null, invitationData.reception || null,
+          invitationData.receptionTime || null, invitationData.theme || null, invitationData.rsvpContact || null, invitationData.rsvpContactSecondary || null,
+          invitationData.additionalInfo || null, invitationData.invitingFamily || null,
+          invitationData.guestName || null, invitationData.invitationImage || null,
+          invitationData.selectedTemplate || 'template1', invitationData.dateLang || 'en'
         ]
       );
     }
@@ -374,6 +454,8 @@ router.post('/:id/rsvp-settings', validateUUID, requireEventOwnership, async (re
     const rsvpSettings = req.body;
     const pool = getPool();
 
+    console.log('RSVP update for eventId:', id, 'userId:', req.user.id);
+
     // Check if RSVP settings already exist
     const [existing] = await pool.execute(
       'SELECT id FROM rsvp_settings WHERE event_id = ?',
@@ -390,19 +472,20 @@ router.post('/:id/rsvp-settings', validateUUID, requireEventOwnership, async (re
          special_requests_label = ?, special_requests_placeholder = ?,
          additional_fields = ?, submit_button_text = ?, thank_you_message = ?,
          background_color = ?, text_color = ?, button_color = ?, accent_color = ?,
-         rsvp_contact = ?, updated_at = CURRENT_TIMESTAMP
+         rsvp_contact = ?, rsvp_contact_secondary = ?, updated_at = CURRENT_TIMESTAMP
          WHERE event_id = ?`,
         [
-          rsvpSettings.title, rsvpSettings.subtitle, rsvpSettings.location,
-          rsvpSettings.welcomeMessage, rsvpSettings.confirmText, rsvpSettings.declineText,
-          rsvpSettings.guestCountEnabled, rsvpSettings.guestCountLabel,
-          JSON.stringify(rsvpSettings.guestCountOptions), rsvpSettings.specialRequestsEnabled,
-          rsvpSettings.specialRequestsLabel, rsvpSettings.specialRequestsPlaceholder,
-          JSON.stringify(rsvpSettings.additionalFields || []), rsvpSettings.submitButtonText,
-          rsvpSettings.thankYouMessage, rsvpSettings.backgroundColor, rsvpSettings.textColor,
-          rsvpSettings.buttonColor, rsvpSettings.accentColor, rsvpSettings.rsvpContact, id
+          rsvpSettings.title || null, rsvpSettings.subtitle || null, rsvpSettings.location || null,
+          rsvpSettings.welcomeMessage || null, rsvpSettings.confirmText || null, rsvpSettings.declineText || null,
+          rsvpSettings.guestCountEnabled !== undefined ? rsvpSettings.guestCountEnabled : null, rsvpSettings.guestCountLabel || null,
+          rsvpSettings.guestCountOptions ? JSON.stringify(rsvpSettings.guestCountOptions) : null, rsvpSettings.specialRequestsEnabled !== undefined ? rsvpSettings.specialRequestsEnabled : null,
+          rsvpSettings.specialRequestsLabel || null, rsvpSettings.specialRequestsPlaceholder || null,
+          rsvpSettings.additionalFields ? JSON.stringify(rsvpSettings.additionalFields) : null, rsvpSettings.submitButtonText || null,
+          rsvpSettings.thankYouMessage || null, rsvpSettings.backgroundColor || null, rsvpSettings.textColor || null,
+          rsvpSettings.buttonColor || null, rsvpSettings.accentColor || null, rsvpSettings.rsvpContact || null, rsvpSettings.rsvpContactSecondary || null, id
         ]
       );
+      console.log('RSVP settings updated for eventId:', id);
     } else {
       // Create new
       const rsvpId = generateId();
@@ -416,16 +499,17 @@ router.post('/:id/rsvp-settings', validateUUID, requireEventOwnership, async (re
           accent_color, rsvp_contact
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          rsvpId, id, rsvpSettings.title, rsvpSettings.subtitle, rsvpSettings.location,
-          rsvpSettings.welcomeMessage, rsvpSettings.confirmText, rsvpSettings.declineText,
-          rsvpSettings.guestCountEnabled, rsvpSettings.guestCountLabel,
-          JSON.stringify(rsvpSettings.guestCountOptions), rsvpSettings.specialRequestsEnabled,
-          rsvpSettings.specialRequestsLabel, rsvpSettings.specialRequestsPlaceholder,
-          JSON.stringify(rsvpSettings.additionalFields || []), rsvpSettings.submitButtonText,
-          rsvpSettings.thankYouMessage, rsvpSettings.backgroundColor, rsvpSettings.textColor,
-          rsvpSettings.buttonColor, rsvpSettings.accentColor, rsvpSettings.rsvpContact
+          rsvpId, id, rsvpSettings.title || null, rsvpSettings.subtitle || null, rsvpSettings.location || null,
+          rsvpSettings.welcomeMessage || null, rsvpSettings.confirmText || null, rsvpSettings.declineText || null,
+          rsvpSettings.guestCountEnabled !== undefined ? rsvpSettings.guestCountEnabled : null, rsvpSettings.guestCountLabel || null,
+          rsvpSettings.guestCountOptions ? JSON.stringify(rsvpSettings.guestCountOptions) : null, rsvpSettings.specialRequestsEnabled !== undefined ? rsvpSettings.specialRequestsEnabled : null,
+          rsvpSettings.specialRequestsLabel || null, rsvpSettings.specialRequestsPlaceholder || null,
+          rsvpSettings.additionalFields ? JSON.stringify(rsvpSettings.additionalFields) : null, rsvpSettings.submitButtonText || null,
+          rsvpSettings.thankYouMessage || null, rsvpSettings.backgroundColor || null, rsvpSettings.textColor || null,
+          rsvpSettings.buttonColor || null, rsvpSettings.accentColor || null, rsvpSettings.rsvpContact || null
         ]
       );
+      console.log('RSVP settings created for eventId:', id);
     }
 
     res.json({

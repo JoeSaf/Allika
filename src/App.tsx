@@ -17,6 +17,8 @@ import Login from "./pages/Login";
 import { logoutUser, isUserLoggedIn } from "@/utils/auth";
 import { toast } from "@/hooks/use-toast";
 import IdleSessionHandler from "@/components/IdleSessionHandler";
+import InvitationCard from './pages/InvitationCard';
+import Rsvp from './pages/Rsvp';
 
 const queryClient = new QueryClient();
 
@@ -37,8 +39,10 @@ const App = () => {
             <Route path="/template/:id" element={<TemplateEditor />} />
             <Route path="/preview-message" element={<MessagePreview />} />
             <Route path="/pricing" element={<Pricing />} />
-            <Route path="/view-analytics" element={<ViewAnalytics />} />
-            <Route path="/qr-scanner" element={<QrScanner />} />
+            <Route path="/analytics/:eventId" element={<ViewAnalytics />} />
+            <Route path="/qr-scanner/:eventId" element={<QrScanner />} />
+            <Route path="/invitation/:token" element={<InvitationCard />} />
+            <Route path="/rsvp/:token" element={<Rsvp />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

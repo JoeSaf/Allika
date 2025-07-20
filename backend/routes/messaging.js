@@ -3,6 +3,15 @@ import { getPool } from '../config/database.js';
 import { authenticateToken, requireEventOwnership } from '../middleware/auth.js';
 import { validateSendInvites, validateEventId } from '../middleware/validation.js';
 import { generateId } from '../utils/helpers.js';
+import fetch from 'node-fetch'; // Add at the top
+import { exec } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { formatDateTime, formatTimeInWords, formatDateInWords } from '../utils/helpers.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
@@ -16,10 +25,13 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
     const { messageType, guestIds, customMessage } = req.body;
     const pool = getPool();
 
+    console.log('Send invites request:', { eventId, messageType, guestIds, customMessage });
+
     // Get event and invitation data
     const [events] = await pool.execute(
-      `SELECT e.*, eid.couple_name, eid.event_date, eid.event_time, eid.venue,
-              eid.reception, eid.reception_time, eid.theme, eid.rsvp_contact
+      `SELECT e.*, eid.couple_name, eid.event_date, eid.event_date_words, eid.event_time, eid.venue,
+              eid.reception, eid.reception_time, eid.theme, eid.rsvp_contact, eid.rsvp_contact_secondary,
+              e.date_lang, eid.date_lang as invitation_date_lang
        FROM events e
        LEFT JOIN event_invitation_data eid ON e.id = eid.event_id
        WHERE e.id = ?`,
@@ -44,7 +56,12 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
       guestParams.push(...guestIds);
     }
 
+    console.log('Guest query:', guestQuery);
+    console.log('Guest params:', guestParams);
+
     const [guests] = await pool.execute(guestQuery, guestParams);
+
+    console.log('Found guests:', guests.length, guests.map(g => ({ id: g.id, name: g.name, phone: g.phone })));
 
     if (guests.length === 0) {
       return res.status(400).json({
@@ -53,17 +70,74 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
       });
     }
 
-    // Initialize Twilio client if credentials are available
-    let twilioClient = null;
-    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-      const twilio = await import('twilio');
-      twilioClient = twilio.default(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    // Initialize mNotify client if credentials are available
+    let mNotifyClient = null;
+    if (process.env.MNOTIFY_API_KEY) {
+      try {
+        mNotifyClient = require('mnotify-node');
+        mNotifyClient = new mNotifyClient(process.env.MNOTIFY_API_KEY);
+      } catch (e) {
+        console.error('Failed to initialize mNotify:', e);
+        mNotifyClient = null;
+      }
     }
 
     const sentMessages = [];
     const failedMessages = [];
 
-    // Send messages to each guest
+    if (messageType === 'whatsapp') {
+      // WhatsApp bulk send (handle all guests at once)
+      const bulkMessages = guests.map(guest => ({
+        phone: guest.phone,
+        message: generateMessageContent(event, guest, messageType, customMessage)
+      }));
+      const tempPath = path.join('/tmp', `wa_bulk_${Date.now()}.json`);
+      fs.writeFileSync(tempPath, JSON.stringify(bulkMessages, null, 2));
+      try {
+        await new Promise((resolve, reject) => {
+          exec(`python3 send_whatsapp_bulk.py "${tempPath}"`, { cwd: path.resolve(__dirname, '../') }, (error, stdout, stderr) => {
+            if (error) return reject(stderr || error.message);
+            resolve(stdout);
+          });
+        });
+        // Mark all as sent
+        for (const guest of guests) {
+          const messageId = generateId();
+          await pool.execute(
+            `INSERT INTO message_logs (
+              id, event_id, guest_id, message_type, recipient, message_content, status, sent_at
+            ) VALUES (?, ?, ?, ?, ?, ?, 'sent', CURRENT_TIMESTAMP)`,
+            [messageId, eventId, guest.id, messageType, guest.phone, generateMessageContent(event, guest, messageType, customMessage)]
+          );
+          sentMessages.push({
+            guestId: guest.id,
+            guestName: guest.name,
+            recipient: guest.phone,
+            messageId,
+            status: 'sent'
+          });
+        }
+      } catch (waError) {
+        for (const guest of guests) {
+          const messageId = generateId();
+          await pool.execute(
+            `INSERT INTO message_logs (
+              id, event_id, guest_id, message_type, recipient, message_content, status, error_message
+            ) VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)`,
+            [messageId, eventId, guest.id, messageType, guest.phone, generateMessageContent(event, guest, messageType, customMessage), waError.toString()]
+          );
+          failedMessages.push({
+            guestId: guest.id,
+            guestName: guest.name,
+            recipient: guest.phone,
+            error: waError.toString()
+          });
+        }
+      } finally {
+        fs.unlinkSync(tempPath);
+      }
+    } else {
+      // Per-guest logic for SMS/email
     for (const guest of guests) {
       try {
         // Generate message content
@@ -82,48 +156,41 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
         let errorMessage = null;
 
         // Send message based on type
-        if (messageType === 'sms' || messageType === 'whatsapp') {
-          if (twilioClient && guest.phone) {
+        if (messageType === 'sms') {
+          if (guest.phone) {
             try {
-              const message = await twilioClient.messages.create({
-                body: messageContent,
-                from: messageType === 'whatsapp' ? 
-                  `whatsapp:${process.env.TWILIO_PHONE_NUMBER}` : 
-                  process.env.TWILIO_PHONE_NUMBER,
-                to: messageType === 'whatsapp' ? 
-                  `whatsapp:${guest.phone}` : 
-                  guest.phone
+              const rsvpLink = `${process.env.FRONTEND_URL}/rsvp/${guest.rsvp_token}`;
+              const smsMessage = messageContent; // Already personalized
+              const notifyRes = await sendNotifyAfricaSMS({
+                phone: guest.phone,
+                name: guest.name,
+                rsvpLink,
+                message: smsMessage
               });
-
               messageStatus = 'sent';
-              
               // Update message log
               await pool.execute(
                 `UPDATE message_logs SET 
                  status = ?, sent_at = CURRENT_TIMESTAMP, error_message = ?
                  WHERE id = ?`,
-                [messageStatus, null, messageId]
+                [messageStatus ?? null, null, messageId ?? null]
               );
-
               sentMessages.push({
                 guestId: guest.id,
                 guestName: guest.name,
                 recipient: guest.phone,
-                messageId: message.sid,
+                messageId: notifyRes.message_id || null,
                 status: messageStatus
               });
-
-            } catch (twilioError) {
+            } catch (notifyError) {
               messageStatus = 'failed';
-              errorMessage = twilioError.message;
-              
+              errorMessage = notifyError.message;
               await pool.execute(
                 `UPDATE message_logs SET 
                  status = ?, error_message = ?
                  WHERE id = ?`,
-                [messageStatus, errorMessage, messageId]
+                [messageStatus ?? null, errorMessage ?? null, messageId ?? null]
               );
-
               failedMessages.push({
                 guestId: guest.id,
                 guestName: guest.name,
@@ -133,15 +200,13 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
             }
           } else {
             messageStatus = 'failed';
-            errorMessage = 'Twilio not configured or no phone number';
-            
+            errorMessage = 'No phone number';
             await pool.execute(
               `UPDATE message_logs SET 
                status = ?, error_message = ?
                WHERE id = ?`,
-              [messageStatus, errorMessage, messageId]
+              [messageStatus ?? null, errorMessage ?? null, messageId ?? null]
             );
-
             failedMessages.push({
               guestId: guest.id,
               guestName: guest.name,
@@ -158,7 +223,7 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
             `UPDATE message_logs SET 
              status = ?, error_message = ?
              WHERE id = ?`,
-            [messageStatus, errorMessage, messageId]
+            [messageStatus ?? null, errorMessage ?? null, messageId ?? null]
           );
 
           failedMessages.push({
@@ -177,6 +242,7 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
           recipient: guest.phone || guest.email,
           error: error.message
         });
+        }
       }
     }
 
@@ -371,18 +437,88 @@ router.post('/:eventId/retry', validateEventId, requireEventOwnership, async (re
   }
 });
 
+// Utility function to send SMS via Notify Africa
+async function sendNotifyAfricaSMS({ phone, name, rsvpLink, message }) {
+  const token = '1032|QWOWLGEXr3yZtYq8RHkOWKblDk1IQ8jzCMFdcHj9fabfdb57';
+  const baseUrl = 'https://api.notify.africa/v2';
+  const url = `${baseUrl}/send-sms`;
+  const smsText = message || `Hello ${name}, you are invited! RSVP: ${rsvpLink}`;
+  const payload = {
+    sender_id: 1,
+    schedule: 'none',
+    sms: smsText,
+    recipients: [{ number: phone }]
+  };
+  const response = await fetch(url, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to send SMS via Notify Africa');
+  }
+  return data;
+}
+
+// Add this function to call the Python script for WhatsApp
+function sendWhatsAppWithPywhatkit(phone, message) {
+  return new Promise((resolve, reject) => {
+    exec(`python3 send_whatsapp.py "${phone}" "${message.replace(/"/g, '\"')}"`, (error, stdout, stderr) => {
+      if (error) return reject(stderr || error.message);
+      resolve(stdout);
+    });
+  });
+}
+
 // Helper function to generate message content
 function generateMessageContent(event, guest, messageType, customMessage) {
   const eventData = event;
   const guestName = guest.name;
+  const language = eventData.invitation_date_lang || eventData.date_lang || eventData.dateLang || 'en';
+  
+  // Debug logging
+  console.log('generateMessageContent debug:', {
+    eventData: {
+      couple_name: eventData.couple_name,
+      event_date: eventData.event_date,
+      event_date_words: eventData.event_date_words,
+      event_time: eventData.event_time,
+      time: eventData.time,
+      venue: eventData.venue,
+      date_lang: eventData.date_lang,
+      invitation_date_lang: eventData.invitation_date_lang,
+      dateLang: eventData.dateLang
+    },
+    language,
+    guestName
+  });
+  
+  // Format time in words
+  const eventTimeInWords = formatTimeInWords(eventData.event_time || eventData.time, language);
+  const receptionTimeInWords = formatTimeInWords(eventData.reception_time || eventData.receptionTime, language);
+  
+  // Format date in words - prefer event_date_words if available, otherwise format the date
+  const eventDateInWords = eventData.event_date_words || formatDateInWords(eventData.event_date || eventData.date, language);
+  
+  console.log('Formatted values:', {
+    eventTimeInWords,
+    eventDateInWords,
+    language
+  });
   
   // Use custom message if provided, otherwise generate default
   if (customMessage) {
     return customMessage
       .replace(/{guestName}/g, guestName)
       .replace(/{eventTitle}/g, eventData.couple_name || eventData.title)
-      .replace(/{eventDate}/g, eventData.event_date || eventData.date)
-      .replace(/{eventTime}/g, eventData.event_time || eventData.time)
+      .replace(/{eventDate}/g, eventDateInWords)
+      .replace(/{eventTime}/g, eventTimeInWords)
+      .replace(/{receptionTime}/g, receptionTimeInWords)
       .replace(/{venue}/g, eventData.venue)
       .replace(/{rsvpLink}/g, `${process.env.FRONTEND_URL}/rsvp/${guest.rsvp_token}`);
   }
@@ -391,7 +527,7 @@ function generateMessageContent(event, guest, messageType, customMessage) {
   const templates = {
     sms: `🎉 Habari ${guestName}!
 
-Tafadhali pokea mwaliko wa ${eventData.couple_name || eventData.title}, Itakayofanyika ${eventData.event_date || eventData.date}, ${eventData.venue}.
+Tafadhali pokea mwaliko wa ${eventData.couple_name || eventData.title}, Itakayofanyika ${eventDateInWords}${eventTimeInWords ? `, ${eventTimeInWords}` : ''}, ${eventData.venue}.
 
 Tafadhali bofya chaguo mojawapo hapo chini kuthibitisha ushiriki
 
@@ -402,7 +538,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`,
 
     whatsapp: `🎉 Habari ${guestName}!
 
-Tafadhali pokea mwaliko wa ${eventData.couple_name || eventData.title}, Itakayofanyika ${eventData.event_date || eventData.date}, ${eventData.venue}.
+Tafadhali pokea mwaliko wa ${eventData.couple_name || eventData.title}, Itakayofanyika ${eventDateInWords}${eventTimeInWords ? `, ${eventTimeInWords}` : ''}, ${eventData.venue}.
 
 Tafadhali bofya chaguo mojawapo hapo chini kuthibitisha ushiriki
 
@@ -413,7 +549,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`,
 
     email: `Dear ${guestName},
 
-You are cordially invited to ${eventData.couple_name || eventData.title} on ${eventData.event_date || eventData.date} at ${eventData.venue}.
+You are cordially invited to ${eventData.couple_name || eventData.title} on ${eventDateInWords}${eventTimeInWords ? ` at ${eventTimeInWords}` : ''} at ${eventData.venue}.
 
 Please click the link below to RSVP:
 

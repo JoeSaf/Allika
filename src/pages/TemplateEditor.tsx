@@ -7,11 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Download, Send, QrCode, Save, Upload, X, Plus, Minus, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Download, Send, QrCode, Save, Upload, X, Plus, Minus, CheckCircle, XCircle, BarChart3 } from 'lucide-react';
 import Header from '@/components/Header';
 import html2canvas from 'html2canvas';
-import { getCurrentEvent, saveInvitationData, saveRsvpSettings, getEvent } from '@/utils/storage';
 import { toast } from '@/hooks/use-toast';
+
+import { apiService } from '@/services/api';
+import InvitationCardTemplate from '@/components/InvitationCardTemplate';
 import SendInvitationModal from '@/components/SendInvitationModal';
 
 const TemplateEditor = () => {
@@ -26,18 +28,20 @@ const TemplateEditor = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   const [invitationData, setInvitationData] = useState({
-    coupleName: 'James & Patricia',
-    eventDate: 'Saturday 5th July, 2025',
-    eventTime: '11AM',
-    venue: 'St. Peter\'s Church, Oysterbay',
-    reception: 'Lugalo Golf Club - Kawe',
-    receptionTime: '6:00PM',
-    theme: 'Movie Stars',
-    rsvpContact: '+255786543366',
-    additionalInfo: 'Kindly confirm your attendance',
-    invitingFamily: 'MR. & MRS. FRANCIS BROWN',
-    guestName: 'COLLINS VICTOR LEMA',
-    invitationImage: null
+    coupleName: '',
+    eventDate: '',
+    eventDateWords: '',
+    eventTime: '',
+    venue: '',
+    reception: '',
+    receptionTime: '',
+    theme: '',
+    rsvpContact: '',
+    rsvpContactSecondary: '',
+    additionalInfo: '',
+    invitingFamily: '',
+    invitationImage: null,
+    dateLang: 'en'
   });
 
   const [rsvpData, setRsvpData] = useState({
@@ -65,6 +69,15 @@ const TemplateEditor = () => {
   const [activeTab, setActiveTab] = useState('invitation');
   const [showSendModal, setShowSendModal] = useState(false);
 
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Add at the top, after imports
+  const phoneRegex = /^\+\d{1,3}\d{9}$/;
+
+  // Add to component state:
+  const [rsvpContactError, setRsvpContactError] = useState('');
+  const [rsvpContactSecondaryError, setRsvpContactSecondaryError] = useState('');
+
   // Load event data on component mount
   useEffect(() => {
     loadEventData();
@@ -72,30 +85,50 @@ const TemplateEditor = () => {
 
   // Auto-save invitation data when it changes
   useEffect(() => {
-    if (currentEvent && !isLoading) {
+    if (currentEvent && !isLoading && !isInitialLoad) {
       const timeoutId = setTimeout(() => {
         saveInvitationDataToStorage();
       }, 1000); // Auto-save after 1 second of inactivity
 
       return () => clearTimeout(timeoutId);
     }
-  }, [invitationData, currentEvent, isLoading]);
+  }, [invitationData, currentEvent, isLoading, isInitialLoad]);
 
   // Auto-save RSVP data when it changes
   useEffect(() => {
-    if (currentEvent && !isLoading) {
+    if (currentEvent && !isLoading && !isInitialLoad) {
       const timeoutId = setTimeout(() => {
         saveRsvpDataToStorage();
       }, 1000); // Auto-save after 1 second of inactivity
 
       return () => clearTimeout(timeoutId);
     }
-  }, [rsvpData, currentEvent, isLoading]);
+  }, [rsvpData, currentEvent, isLoading, isInitialLoad]);
 
-  const loadEventData = () => {
+  // Generate eventDateWords when eventDate or dateLang changes
+  useEffect(() => {
+    if (invitationData.eventDate && invitationData.dateLang) {
+      const eventDateWords = getEventDateWords();
+      if (eventDateWords !== invitationData.eventDateWords) {
+        setInvitationData(prev => ({ ...prev, eventDateWords }));
+      }
+    }
+  }, [invitationData.eventDate, invitationData.dateLang]);
+
+  const loadEventData = async () => {
     try {
-      const event = getEvent(id);
-      if (!event) {
+      if (!id) {
+        toast({
+          title: "Event ID Required",
+          description: "No event ID provided.",
+          variant: "destructive"
+        });
+        navigate('/dashboard');
+        return;
+      }
+
+      const response = await apiService.getEvent(id);
+      if (!response.success || !response.data?.event) {
         toast({
           title: "Event Not Found",
           description: "The event you're trying to edit doesn't exist.",
@@ -105,51 +138,78 @@ const TemplateEditor = () => {
         return;
       }
 
+      const event = response.data.event;
       setCurrentEvent(event);
       
       // Load existing invitation data if available
-      if (event.invitationData) {
+      if (event.couple_name || event.coupleName || event.invitation_id) {
         setInvitationData({
-          coupleName: event.invitationData.coupleName || event.title || 'James & Patricia',
-          eventDate: event.invitationData.eventDate || event.date || 'Saturday 5th July, 2025',
-          eventTime: event.invitationData.eventTime || event.time || '11AM',
-          venue: event.invitationData.venue || event.venue || 'St. Peter\'s Church, Oysterbay',
-          reception: event.invitationData.reception || event.reception || 'Lugalo Golf Club - Kawe',
-          receptionTime: event.invitationData.receptionTime || event.receptionTime || '6:00PM',
-          theme: event.invitationData.theme || event.theme || 'Movie Stars',
-          rsvpContact: event.invitationData.rsvpContact || event.rsvpContact || '+255786543366',
-          additionalInfo: event.invitationData.additionalInfo || event.additionalInfo || 'Kindly confirm your attendance',
-          invitingFamily: event.invitationData.invitingFamily || event.invitingFamily || 'MR. & MRS. FRANCIS BROWN',
-          guestName: event.invitationData.guestName || 'COLLINS VICTOR LEMA',
-          invitationImage: event.invitationData.invitationImage || event.invitationImage || null
+          coupleName: event.coupleName || event.couple_name || event.title || '',
+          eventDate: event.eventDate || event.event_date || event.date || '',
+          eventDateWords: event.eventDateWords || event.event_date_words || '',
+          eventTime: event.eventTime || event.event_time || event.time || '',
+          venue: event.venue || '',
+          reception: event.reception || event.reception_venue || '',
+          receptionTime: event.receptionTime || event.reception_time || '',
+          theme: event.theme || '',
+          rsvpContact: event.rsvpContact || event.rsvp_contact || '',
+          rsvpContactSecondary: event.rsvpContactSecondary || event.rsvp_contact_secondary || '',
+          additionalInfo: event.additionalInfo || event.additional_info || '',
+          invitingFamily: event.invitingFamily || event.inviting_family || '',
+          invitationImage: event.invitationImage || event.invitation_image || null,
+          selectedTemplate: event.selectedTemplate || event.selected_template || 'template1',
+          dateLang: event.dateLang || event.date_lang || 'en'
         });
       } else {
-        // Use event data to populate defaults
         setInvitationData(prev => ({
           ...prev,
-          coupleName: event.title || prev.coupleName,
-          eventDate: event.date || prev.eventDate,
-          eventTime: event.time || prev.eventTime,
-          venue: event.venue || prev.venue,
-          reception: event.reception || prev.reception,
-          receptionTime: event.receptionTime || prev.receptionTime,
-          theme: event.theme || prev.theme,
-          rsvpContact: event.rsvpContact || prev.rsvpContact,
-          additionalInfo: event.additionalInfo || prev.additionalInfo,
-          invitingFamily: event.invitingFamily || prev.invitingFamily,
-          invitationImage: event.invitationImage || prev.invitationImage
+          coupleName: event.title || '',
+          eventDate: event.date || '',
+          eventDateWords: event.eventDateWords || event.event_date_words || '',
+          eventTime: event.time || '',
+          venue: event.venue || '',
+          reception: event.reception || '',
+          receptionTime: event.reception_time || '',
+          theme: event.theme || '',
+          rsvpContact: event.rsvp_contact || '',
+          rsvpContactSecondary: '',
+          additionalInfo: '',
+          invitingFamily: '',
+          invitationImage: null,
+          selectedTemplate: 'template1',
+          dateLang: event.dateLang || event.date_lang || 'en'
         }));
       }
 
       // Load RSVP settings
-      if (event.rsvpSettings) {
+      if (event.rsvp_id || event.rsvp_title) {
         setRsvpData(prev => ({
           ...prev,
-          ...event.rsvpSettings
+          title: event.rsvp_title || prev.title,
+          subtitle: event.rsvp_subtitle || prev.subtitle,
+          location: event.rsvp_location || prev.location,
+          welcomeMessage: event.welcome_message || prev.welcomeMessage,
+          confirmText: event.confirm_text || prev.confirmText,
+          declineText: event.decline_text || prev.declineText,
+          guestCountEnabled: event.guest_count_enabled !== undefined ? event.guest_count_enabled : prev.guestCountEnabled,
+          guestCountLabel: event.guest_count_label || prev.guestCountLabel,
+          guestCountOptions: event.guest_count_options ? JSON.parse(event.guest_count_options) : prev.guestCountOptions,
+          specialRequestsEnabled: event.special_requests_enabled !== undefined ? event.special_requests_enabled : prev.specialRequestsEnabled,
+          specialRequestsLabel: event.special_requests_label || prev.specialRequestsLabel,
+          specialRequestsPlaceholder: event.special_requests_placeholder || prev.specialRequestsPlaceholder,
+          additionalFields: event.additional_fields ? JSON.parse(event.additional_fields) : prev.additionalFields,
+          submitButtonText: event.submit_button_text || prev.submitButtonText,
+          thankYouMessage: event.thank_you_message || prev.thankYouMessage,
+          backgroundColor: event.background_color || prev.backgroundColor,
+          textColor: event.text_color || prev.textColor,
+          buttonColor: event.button_color || prev.buttonColor,
+          accentColor: event.accent_color || prev.accentColor,
+          rsvpContact: event.rsvp_contact_info || prev.rsvpContact
         }));
       }
 
       setIsLoading(false);
+      setIsInitialLoad(false);
     } catch (error) {
       console.error('Error loading event data:', error);
       toast({
@@ -158,41 +218,64 @@ const TemplateEditor = () => {
         variant: "destructive"
       });
       setIsLoading(false);
+      setIsInitialLoad(false);
     }
   };
 
-  const saveInvitationDataToStorage = () => {
+  const getEventDateWords = () => {
+    if (!invitationData.eventDate) return '';
+    const dateLang = invitationData.dateLang || 'en';
+    const dateLocale = dateLang === 'sw' ? 'sw-TZ' : 'en-US';
+    return new Date(invitationData.eventDate).toLocaleDateString(
+      dateLocale,
+      { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
+    );
+  };
+
+  const saveInvitationDataToStorage = async () => {
     if (!currentEvent) return;
     
     try {
-      saveInvitationData(currentEvent.id, invitationData);
+      const eventDateWords = getEventDateWords();
+      await apiService.updateInvitationData(currentEvent.id, {
+        ...invitationData,
+        eventDateWords,
+        dateLang: invitationData.dateLang || 'en',
+        selectedTemplate // Save the selected template
+      });
       console.log('Auto-saved invitation data');
     } catch (error) {
       console.error('Error auto-saving invitation data:', error);
     }
   };
 
-  const saveRsvpDataToStorage = () => {
+  const saveRsvpDataToStorage = async () => {
     if (!currentEvent) return;
     
     try {
-      saveRsvpSettings(currentEvent.id, rsvpData);
+      await apiService.updateRsvpSettings(currentEvent.id, rsvpData);
       console.log('Auto-saved RSVP data');
     } catch (error) {
       console.error('Error auto-saving RSVP data:', error);
     }
   };
 
-  const handleManualSave = () => {
+  const handleManualSave = async () => {
     if (!currentEvent) return;
-    
     try {
-      saveInvitationDataToStorage();
-      saveRsvpDataToStorage();
-      
+      const eventDateWords = getEventDateWords();
+      await apiService.updateInvitationData(currentEvent.id, {
+        ...invitationData,
+        eventDateWords,
+        dateLang: invitationData.dateLang || 'en',
+        selectedTemplate // Save the selected template
+      });
+      await saveRsvpDataToStorage();
+      // Set event status to active
+      await apiService.updateEvent(currentEvent.id, { status: 'active' });
       toast({
         title: "Saved Successfully",
-        description: "Your event details have been saved.",
+        description: "Your event details have been saved and the event is now active.",
       });
     } catch (error) {
       toast({
@@ -220,6 +303,12 @@ const TemplateEditor = () => {
 
   const handleInputChange = (field, value) => {
     setInvitationData(prev => ({ ...prev, [field]: value }));
+    if (field === 'rsvpContact') {
+      setRsvpContactError(value && !phoneRegex.test(value) ? 'Invalid phone. Use +countrycode and 9 digits.' : '');
+    }
+    if (field === 'rsvpContactSecondary') {
+      setRsvpContactSecondaryError(value && !phoneRegex.test(value) ? 'Invalid phone. Use +countrycode and 9 digits.' : '');
+    }
   };
 
   const handleRsvpChange = (field, value) => {
@@ -298,205 +387,6 @@ const TemplateEditor = () => {
     }));
   };
 
-  // Template 1: Classic Portrait (Original design)
-  const renderTemplate1 = () => (
-    <div 
-      className="bg-gradient-to-br from-slate-700 to-slate-800 p-8 rounded-lg text-center border border-slate-600 shadow-2xl relative overflow-hidden"
-      style={{
-        backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.05"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'
-      }}
-    >
-      {invitationData.invitationImage && (
-        <div className="absolute inset-0 opacity-20">
-          <img
-            src={invitationData.invitationImage}
-            alt="Background"
-            className="w-full h-full object-cover rounded-lg"
-          />
-        </div>
-      )}
-      
-      <div className="relative z-10">
-        <div className="mb-6">
-          <p className="text-teal-400 text-sm uppercase tracking-wider mb-2">Lights, Camera, Love</p>
-          <p className="text-white text-xs opacity-75 mb-1">THE FAMILY OF</p>
-          <p className="text-white text-xs opacity-75 mb-4">{invitationData.invitingFamily}</p>
-          <p className="text-white text-xs opacity-75 mb-4">CORDIALLY INVITES</p>
-          <h1 className="text-white text-xs uppercase tracking-wide mb-2">{invitationData.guestName}</h1>
-        </div>
-        
-        <div className="mb-6">
-          <p className="text-white text-xs mb-1">TO THE WEDDING CEREMONY</p>
-          <p className="text-white text-xs mb-1">OF THEIR BELOVED CHILDREN</p>
-          
-          <div className="my-6">
-            <h2 className="text-white text-2xl font-script mb-2">{invitationData.coupleName}</h2>
-          </div>
-          
-          <p className="text-white text-xs mb-1">AS THEY EXCHANGE THEIR VOWS</p>
-          <p className="text-white text-xs mb-1">ON {invitationData.eventDate.toUpperCase()}</p>
-          <p className="text-white text-xs mb-1">{invitationData.eventTime}, {invitationData.venue.toUpperCase()}</p>
-          <p className="text-white text-xs mb-1">FOLLOWED BY RECEPTION</p>
-          <p className="text-white text-xs mb-6">AT {invitationData.receptionTime}, {invitationData.reception.toUpperCase()}</p>
-          
-          <p className="text-white text-xs mb-4">THEME: {invitationData.theme.toUpperCase()}</p>
-          
-          <div className="border-t border-white/20 pt-4 mb-4">
-            <p className="text-white text-xs mb-2">RSVP:</p>
-            <p className="text-teal-400 text-xs font-mono">{invitationData.rsvpContact}</p>
-          </div>
-          
-          <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-white/90 rounded flex items-center justify-center">
-              <QrCode className="w-12 h-12 text-slate-900" />
-            </div>
-          </div>
-          
-          <p className="text-white text-xs bg-slate-900/50 px-2 py-1 rounded">SINGLE</p>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Template 2: Modern Landscape
-  const renderTemplate2 = () => (
-    <div className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-lg border border-slate-600 shadow-2xl relative overflow-hidden min-h-[500px]">
-      <div className="grid grid-cols-2 h-full">
-        {/* Left side - Image */}
-        <div className="relative bg-slate-600 flex items-center justify-center">
-          {invitationData.invitationImage ? (
-            <img
-              src={invitationData.invitationImage}
-              alt="Invitation"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="text-slate-400 text-center">
-              <Upload className="w-16 h-16 mx-auto mb-4" />
-              <p>Your image will appear here</p>
-            </div>
-          )}
-        </div>
-        
-        {/* Right side - Text */}
-        <div className="p-6 flex flex-col justify-center text-center">
-          <div className="mb-4">
-            <p className="text-teal-400 text-sm uppercase tracking-wider mb-2">Save The Date</p>
-            <h2 className="text-white text-3xl font-bold mb-2">{invitationData.coupleName}</h2>
-            <p className="text-white text-lg mb-4">{invitationData.eventDate}</p>
-          </div>
-          
-          <div className="mb-4">
-            <p className="text-white text-sm mb-1">CEREMONY: {invitationData.eventTime}</p>
-            <p className="text-white text-sm mb-1">{invitationData.venue}</p>
-            <p className="text-white text-sm mb-1">RECEPTION: {invitationData.receptionTime}</p>
-            <p className="text-white text-sm mb-4">{invitationData.reception}</p>
-          </div>
-          
-          <div className="border-t border-white/20 pt-4">
-            <p className="text-white text-sm mb-1">THEME: {invitationData.theme}</p>
-            <p className="text-teal-400 text-sm">{invitationData.rsvpContact}</p>
-          </div>
-          
-          <div className="mt-4">
-            <div className="w-12 h-12 bg-white/90 rounded mx-auto flex items-center justify-center">
-              <QrCode className="w-8 h-8 text-slate-900" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Template 3: Artistic Layout
-  const renderTemplate3 = () => (
-    <div className="bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 rounded-lg border border-slate-600 shadow-2xl relative overflow-hidden min-h-[600px]">
-      <div className="absolute inset-0">
-        <div className="absolute top-4 right-4 w-32 h-32 bg-teal-500/20 rounded-full blur-xl"></div>
-        <div className="absolute bottom-4 left-4 w-24 h-24 bg-purple-500/20 rounded-full blur-xl"></div>
-      </div>
-      
-      <div className="relative z-10 p-8">
-        {/* Header Section */}
-        <div className="mb-8">
-          <p className="text-teal-400 text-sm uppercase tracking-wider mb-2">You're Invited</p>
-          <h1 className="text-white text-4xl font-bold mb-2">{invitationData.coupleName}</h1>
-          <p className="text-white text-xl">{invitationData.eventDate}</p>
-        </div>
-        
-        {/* Content Grid */}
-        <div className="grid grid-cols-3 gap-6">
-          {/* Left Column */}
-          <div className="col-span-1">
-            {invitationData.invitationImage ? (
-              <img
-                src={invitationData.invitationImage}
-                alt="Invitation"
-                className="w-full h-40 object-cover rounded-lg shadow-lg"
-              />
-            ) : (
-              <div className="w-full h-40 bg-slate-600 rounded-lg flex items-center justify-center">
-                <Upload className="w-12 h-12 text-slate-400" />
-              </div>
-            )}
-            
-            <div className="mt-4 text-center">
-              <div className="w-16 h-16 bg-white/90 rounded-lg mx-auto flex items-center justify-center">
-                <QrCode className="w-12 h-12 text-slate-900" />
-              </div>
-            </div>
-          </div>
-          
-          {/* Right Columns */}
-          <div className="col-span-2">
-            <div className="bg-black/20 rounded-lg p-6 backdrop-blur-sm">
-              <div className="mb-6">
-                <p className="text-white text-sm mb-2">CEREMONY</p>
-                <p className="text-white font-semibold">{invitationData.eventTime}</p>
-                <p className="text-white text-sm">{invitationData.venue}</p>
-              </div>
-              
-              <div className="mb-6">
-                <p className="text-white text-sm mb-2">RECEPTION</p>
-                <p className="text-white font-semibold">{invitationData.receptionTime}</p>
-                <p className="text-white text-sm">{invitationData.reception}</p>
-              </div>
-              
-              <div className="mb-6">
-                <p className="text-white text-sm mb-2">THEME</p>
-                <p className="text-teal-400 font-semibold">{invitationData.theme}</p>
-              </div>
-              
-              <div className="border-t border-white/20 pt-4">
-                <p className="text-white text-sm mb-1">RSVP</p>
-                <p className="text-teal-400 font-mono">{invitationData.rsvpContact}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Guest Info */}
-        <div className="mt-8 text-center">
-          <p className="text-white text-sm opacity-75">Guest: {invitationData.guestName}</p>
-          <p className="text-white text-xs opacity-50 mt-2">{invitationData.additionalInfo}</p>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderInvitationPreview = () => {
-    switch (selectedTemplate) {
-      case 'template1':
-        return renderTemplate1();
-      case 'template2':
-        return renderTemplate2();
-      case 'template3':
-        return renderTemplate3();
-      default:
-        return renderTemplate1();
-    }
-  };
-
   const handleDownload = async (type = 'invitation') => {
     const ref = type === 'invitation' ? cardRef : rsvpRef;
     if (ref.current) {
@@ -514,9 +404,17 @@ const TemplateEditor = () => {
   };
 
   const handleSendInvitations = () => {
+    // Check if event is active
+    if (currentEvent?.status !== 'active') {
+      toast({
+        title: "Event Not Active",
+        description: "Please save your changes first to activate the event before sending invitations.",
+        variant: "destructive"
+      });
+      return;
+    }
     // Save data before navigating
     handleManualSave();
-    
     console.log('Sending invitations with data:', { invitationData, rsvpData });
     navigate('/preview-message');
   };
@@ -555,6 +453,16 @@ const TemplateEditor = () => {
       </div>
     );
   }
+
+  // Helper to get today's date in YYYY-MM-DD
+  const todayStr = new Date().toISOString().slice(0, 10);
+  // Helper to get current time in HH:MM
+  const now = new Date();
+  const pad = (n) => n.toString().padStart(2, '0');
+  const currentTimeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  // Determine language for date preview
+  const dateLang = invitationData.dateLang || 'en';
+  const dateLocale = dateLang === 'sw' ? 'sw-TZ' : 'en-US';
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -636,17 +544,6 @@ const TemplateEditor = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="guestName" className="text-white">Guest Name</Label>
-                      <Input
-                        id="guestName"
-                        value={invitationData.guestName}
-                        onChange={(e) => handleInputChange('guestName', e.target.value)}
-                        className="bg-slate-700 border-slate-600 text-white mt-2"
-                        placeholder="e.g., COLLINS VICTOR LEMA"
-                      />
-                    </div>
-
-                    <div>
                       <Label htmlFor="coupleName" className="text-white">Couple Name / Event Title</Label>
                       <Input
                         id="coupleName"
@@ -656,25 +553,54 @@ const TemplateEditor = () => {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
                         <Label htmlFor="eventDate" className="text-white">Event Date</Label>
                         <Input
                           id="eventDate"
-                          value={invitationData.eventDate}
-                          onChange={(e) => handleInputChange('eventDate', e.target.value)}
+                          type="date"
+                          value={invitationData.eventDate ? invitationData.eventDate.slice(0, 10) : ''}
+                          min={todayStr}
+                          onChange={e => handleInputChange('eventDate', e.target.value)}
                           className="bg-slate-700 border-slate-600 text-white mt-2"
                         />
+                        {/* Localized date preview */}
+                        {invitationData.eventDate && (
+                          <div className="text-xs text-slate-400 mt-1">
+                            {new Date(invitationData.eventDate).toLocaleDateString(
+                              dateLocale,
+                              { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
+                            )}
                       </div>
-                      <div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
                         <Label htmlFor="eventTime" className="text-white">Event Time</Label>
                         <Input
                           id="eventTime"
-                          value={invitationData.eventTime}
-                          onChange={(e) => handleInputChange('eventTime', e.target.value)}
+                          type="time"
+                          value={invitationData.eventTime || ''}
+                          min={invitationData.eventDate && invitationData.eventDate.slice(0, 10) === todayStr ? currentTimeStr : undefined}
+                          onChange={e => handleInputChange('eventTime', e.target.value)}
                           className="bg-slate-700 border-slate-600 text-white mt-2"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="dateLang" className="text-white">Date Language</Label>
+                      <select
+                        id="dateLang"
+                        value={invitationData.dateLang || 'en'}
+                        onChange={e => handleInputChange('dateLang', e.target.value)}
+                        className="w-full bg-slate-700 border border-slate-600 text-white rounded-md p-2 mt-2"
+                      >
+                        <option value="en">English</option>
+                        <option value="sw">Swahili</option>
+                      </select>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Choose the language for displaying the date on your invitation
+                      </p>
                     </div>
 
                     <div>
@@ -701,6 +627,7 @@ const TemplateEditor = () => {
                         <Label htmlFor="receptionTime" className="text-white">Reception Time</Label>
                         <Input
                           id="receptionTime"
+                          type="time"
                           value={invitationData.receptionTime}
                           onChange={(e) => handleInputChange('receptionTime', e.target.value)}
                           className="bg-slate-700 border-slate-600 text-white mt-2"
@@ -719,14 +646,30 @@ const TemplateEditor = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="rsvpContact" className="text-white">RSVP Contact</Label>
+                      <Label htmlFor="rsvpContact" className="text-white">RSVP Contact (Phone Number)</Label>
                       <Input
                         id="rsvpContact"
+                        type="tel"
                         value={invitationData.rsvpContact}
                         onChange={(e) => handleInputChange('rsvpContact', e.target.value)}
+                        placeholder="+255 123 456 789"
                         className="bg-slate-700 border-slate-600 text-white mt-2"
                       />
                     </div>
+                    {rsvpContactError && <div className="text-red-400 text-xs mt-1">{rsvpContactError}</div>}
+
+                                         <div>
+                       <Label htmlFor="rsvpContactSecondary" className="text-white">Secondary RSVP Contact (Phone Number)</Label>
+                       <Input
+                         id="rsvpContactSecondary"
+                         type="tel"
+                         value={invitationData.rsvpContactSecondary}
+                         onChange={(e) => handleInputChange('rsvpContactSecondary', e.target.value)}
+                         placeholder="+255 987 654 321"
+                        className="bg-slate-700 border-slate-600 text-white mt-2"
+                      />
+                    </div>
+                    {rsvpContactSecondaryError && <div className="text-red-400 text-xs mt-1">{rsvpContactSecondaryError}</div>}
 
                     <div>
                       <Label htmlFor="additionalInfo" className="text-white">Additional Information</Label>
@@ -798,7 +741,11 @@ const TemplateEditor = () => {
                   </div>
                   
                   <div ref={cardRef}>
-                    {renderInvitationPreview()}
+                    <InvitationCardTemplate
+                      invitationData={invitationData}
+                      template={selectedTemplate}
+                      // No guest/event/qrCode in editor preview
+                    />
                   </div>
                 </Card>
               </div>
@@ -1309,35 +1256,49 @@ const TemplateEditor = () => {
 
         {/* Action Buttons */}
         <div className="flex gap-4 mt-8">
-          <button
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
-            onClick={() => setShowSendModal(true)}
-          >
-            <Send className="w-5 h-5" />
-            Send Invitation
-          </button>
           <Button
-            onClick={() => setActiveTab('preview')}
-            className="bg-green-600 hover:bg-green-700 text-white flex-1 flex items-center justify-center gap-2"
-          >
-            <Send className="w-4 h-4 mr-2" />
-            Preview Messages
-          </Button>
-          <Button 
             onClick={handleManualSave}
-            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+            className="bg-teal-600 hover:bg-teal-700 text-white px-8 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
           >
-            <Save className="w-4 h-4 mr-2" />
+            <Save className="w-5 h-5" />
             Save Changes
+          </Button>
+          
+          <Button
+            onClick={() => setShowSendModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
+        >
+          <Send className="w-5 h-5" />
+          Send Invitation
+          </Button>
+          
+          <Button
+            onClick={() => navigate(`/analytics/${currentEvent?.id}`)}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
+          >
+            <BarChart3 className="w-5 h-5" />
+            Manage Guests & Analytics
+          </Button>
+          
+          <Button 
+            onClick={() => navigate('/preview-message')}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
+          >
+            <QrCode className="w-5 h-5" />
+            Preview Messages
           </Button>
         </div>
       </div>
-      <SendInvitationModal
-        open={showSendModal}
-        onClose={() => setShowSendModal(false)}
-        eventId={currentEvent?.id}
-        template={currentEvent}
-      />
+      
+      {currentEvent && (
+        <SendInvitationModal
+          open={showSendModal}
+          onClose={() => setShowSendModal(false)}
+          eventId={currentEvent.id}
+          template={currentEvent}
+        />
+      )}
+
     </div>
   );
 };
