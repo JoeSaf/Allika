@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     proxy: {
-      '/api': 'http://192.168.1.122:5000'
+      '/api': 'http://localhost:5000'
     }
   },
   plugins: [

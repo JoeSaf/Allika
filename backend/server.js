@@ -49,7 +49,10 @@ app.use(helmet({
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'http://192.168.1.122:8080' // <-- Add this line
+    'http://192.168.1.122:8080',
+    'http://localhost:8080',
+    'http://10.135.163.1:8080',
+    'http://172.17.0.1:8080'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

@@ -1,3 +1,5 @@
-2025/07/20-14:06:56.045 4 Reusing MANIFEST /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/Local Storage/leveldb/MANIFEST-000001
-2025/07/20-14:06:56.072 4 Recovering log #3
-2025/07/20-14:06:56.073 4 Reusing old log /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/Local Storage/leveldb/000003.log 
+2025/07/22-22:40:35.880 4 Reusing MANIFEST /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/Local Storage/leveldb/MANIFEST-000001
+2025/07/22-22:40:35.933 4 Recovering log #3
+2025/07/22-22:40:35.944 4 Level-0 table #3: started
+2025/07/22-22:40:35.960 4 Level-0 table #3: 19677 bytes OK
+2025/07/22-22:40:35.970 4 Delete type=0 #3
