@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Download, Send, QrCode, Save, Upload, X, Plus, Minus, CheckCircle, XCircle, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Download, Send, QrCode, Save, Upload, X, Plus, Minus, CheckCircle, XCircle, BarChart3, Loader2 } from 'lucide-react';
 import Header from '@/components/Header';
 import html2canvas from 'html2canvas';
 import { toast } from '@/hooks/use-toast';
@@ -16,70 +16,65 @@ import { apiService } from '@/services/api';
 import InvitationCardTemplate from '@/components/InvitationCardTemplate';
 import SendInvitationModal from '@/components/SendInvitationModal';
 
+// Error Boundary for TemplateEditor
+class TemplateEditorErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('TemplateEditor error boundary caught:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center">
+          <Header />
+          <div className="bg-slate-800 border-slate-700 p-8 rounded-lg mt-12 text-center">
+            <h2 className="text-2xl font-bold text-red-400 mb-4">Something went wrong</h2>
+            <p className="text-slate-300 mb-4">An unexpected error occurred in the Template Editor.</p>
+            <pre className="text-xs text-red-300 mb-4">{this.state.error?.toString()}</pre>
+            <Button onClick={() => window.location.reload()} className="bg-teal-600 hover:bg-teal-700 text-white">Reload Page</Button>
+            <Button variant="outline" className="ml-4 border-slate-600 text-slate-300 hover:bg-slate-700" onClick={() => window.location.href = '/dashboard'}>Back to Dashboard</Button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const TemplateEditor = () => {
+  // All hooks at the top
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const cardRef = useRef(null);
   const rsvpRef = useRef(null);
   const fileInputRef = useRef(null);
-  
   const [selectedTemplate, setSelectedTemplate] = useState('template1');
   const [currentEvent, setCurrentEvent] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  
   const [invitationData, setInvitationData] = useState({
-    coupleName: '',
-    eventDate: '',
-    eventDateWords: '',
-    eventTime: '',
-    venue: '',
-    reception: '',
-    receptionTime: '',
-    theme: '',
-    rsvpContact: '',
-    rsvpContactSecondary: '',
-    additionalInfo: '',
-    invitingFamily: '',
-    invitationImage: null,
-    dateLang: 'en'
+    coupleName: '', eventDate: '', eventDateWords: '', eventTime: '', venue: '', reception: '', receptionTime: '', theme: '', rsvpContact: '', rsvpContactSecondary: '', additionalInfo: '', invitingFamily: '', invitationImage: null, dateLang: 'en'
   });
-
   const [rsvpData, setRsvpData] = useState({
-    title: 'James & Patricia Wedding',
-    subtitle: 'Saturday 5th July, 2025',
-    location: 'St. Peter\'s Church, Oysterbay',
-    welcomeMessage: 'We are excited to celebrate with you! Please let us know if you can join us.',
-    confirmText: 'Yes, I\'ll be there',
-    declineText: 'Sorry, can\'t make it',
-    guestCountEnabled: true,
-    guestCountLabel: 'Number of guests',
-    guestCountOptions: ['1 person', '2 people', '3 people', '4+ people'],
-    specialRequestsEnabled: true,
-    specialRequestsLabel: 'Special requests or dietary restrictions',
-    specialRequestsPlaceholder: 'Let us know if you have any special requirements...',
-    additionalFields: [],
-    submitButtonText: 'Submit RSVP',
-    thankYouMessage: 'Thank you for your response! We look forward to celebrating with you.',
-    backgroundColor: '#334155',
-    textColor: '#ffffff',
-    buttonColor: '#0d9488',
-    accentColor: '#14b8a6'
+    title: 'James & Patricia Wedding', subtitle: 'Saturday 5th July, 2025', location: 'St. Peter\'s Church, Oysterbay', welcomeMessage: 'We are excited to celebrate with you! Please let us know if you can join us.', confirmText: 'Yes, I\'ll be there', declineText: 'Sorry, can\'t make it', guestCountEnabled: true, guestCountLabel: 'Number of guests', guestCountOptions: ['1 person', '2 people', '3 people', '4+ people'], specialRequestsEnabled: true, specialRequestsLabel: 'Special requests or dietary restrictions', specialRequestsPlaceholder: 'Let us know if you have any special requirements...', additionalFields: [], submitButtonText: 'Submit RSVP', thankYouMessage: 'Thank you for your response! We look forward to celebrating with you.', backgroundColor: '#334155', textColor: '#ffffff', buttonColor: '#0d9488', accentColor: '#14b8a6'
   });
-
   const [activeTab, setActiveTab] = useState('invitation');
   const [showSendModal, setShowSendModal] = useState(false);
-
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  // Add at the top, after imports
-  const phoneRegex = /^\+\d{1,3}\d{9}$/;
-
-  // Add to component state:
   const [rsvpContactError, setRsvpContactError] = useState('');
   const [rsvpContactSecondaryError, setRsvpContactSecondaryError] = useState('');
+  const [loadError, setLoadError] = useState(null);
 
-  // Load event data on component mount
   useEffect(() => {
+    setLoadError(null);
+    setIsLoading(true);
+    setIsInitialLoad(true);
     loadEventData();
   }, [id]);
 
@@ -115,29 +110,22 @@ const TemplateEditor = () => {
     }
   }, [invitationData.eventDate, invitationData.dateLang]);
 
+  // Refactored loadEventData to set error state
   const loadEventData = async () => {
     try {
       if (!id) {
-        toast({
-          title: "Event ID Required",
-          description: "No event ID provided.",
-          variant: "destructive"
-        });
-        navigate('/dashboard');
+        setLoadError('Event ID Required');
+        setIsLoading(false);
+        setIsInitialLoad(false);
         return;
       }
-
       const response = await apiService.getEvent(id);
       if (!response.success || !response.data?.event) {
-        toast({
-          title: "Event Not Found",
-          description: "The event you're trying to edit doesn't exist.",
-          variant: "destructive"
-        });
-        navigate('/dashboard');
+        setLoadError("Event Not Found or Access Denied");
+        setIsLoading(false);
+        setIsInitialLoad(false);
         return;
       }
-
       const event = response.data.event;
       setCurrentEvent(event);
       
@@ -211,12 +199,7 @@ const TemplateEditor = () => {
       setIsLoading(false);
       setIsInitialLoad(false);
     } catch (error) {
-      console.error('Error loading event data:', error);
-      toast({
-        title: "Error Loading Event",
-        description: "There was a problem loading the event data.",
-        variant: "destructive"
-      });
+      setLoadError("Error loading event data: " + (error?.message || error));
       setIsLoading(false);
       setIsInitialLoad(false);
     }
@@ -465,7 +448,12 @@ const TemplateEditor = () => {
   const dateLocale = dateLang === 'sw' ? 'sw-TZ' : 'en-US';
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen bg-slate-900 relative">
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 z-50 pointer-events-none">
+          <Loader2 className="animate-spin text-teal-400 w-10 h-10" />
+        </div>
+      )}
       <Header />
       
       <div className="container mx-auto px-4 py-8 pt-24">
@@ -539,7 +527,7 @@ const TemplateEditor = () => {
                         value={invitationData.invitingFamily}
                         onChange={(e) => handleInputChange('invitingFamily', e.target.value)}
                         className="bg-slate-700 border-slate-600 text-white mt-2"
-                        placeholder="e.g., MR. & MRS. FRANCIS BROWN"
+                        placeholder="e.g., MR. & MRS. JOHN DOE"
                       />
                     </div>
 
@@ -665,7 +653,7 @@ const TemplateEditor = () => {
                          type="tel"
                          value={invitationData.rsvpContactSecondary}
                          onChange={(e) => handleInputChange('rsvpContactSecondary', e.target.value)}
-                         placeholder="+255 987 654 321"
+                         placeholder="+255 123 456 789"
                         className="bg-slate-700 border-slate-600 text-white mt-2"
                       />
                     </div>
@@ -1303,4 +1291,11 @@ const TemplateEditor = () => {
   );
 };
 
-export default TemplateEditor;
+// Wrap TemplateEditor in error boundary for export
+const TemplateEditorWithBoundary = (props) => (
+  <TemplateEditorErrorBoundary>
+    <TemplateEditor {...props} />
+  </TemplateEditorErrorBoundary>
+);
+
+export default TemplateEditorWithBoundary;

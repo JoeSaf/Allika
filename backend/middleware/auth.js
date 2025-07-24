@@ -101,6 +101,7 @@ export const requireEventOwnership = async (req, res, next) => {
     console.log('Checking event ownership:', { eventId, userId });
 
     const pool = getPool();
+    // Allow owner to access their event regardless of status
     const [events] = await pool.execute(
       'SELECT id FROM events WHERE id = ? AND user_id = ?',
       [eventId, userId]
@@ -131,29 +132,32 @@ export const requireEventAccess = async (req, res, next) => {
     const userId = req.user?.id;
 
     const pool = getPool();
-    
-    // Check if user owns the event or if it's a public event
+    // Allow owner to access their event regardless of status
     let query = 'SELECT id, user_id, status FROM events WHERE id = ?';
     let params = [eventId];
 
-    if (userId) {
-      query += ' AND (user_id = ? OR status = "active")';
-      params.push(userId);
-    } else {
-      query += ' AND status = "active"';
-    }
-
     const [events] = await pool.execute(query, params);
-
     if (events.length === 0) {
       return res.status(404).json({
         error: true,
         message: 'Event not found or access denied'
       });
     }
-
-    req.event = events[0];
-    next();
+    const event = events[0];
+    // If user is owner, allow access regardless of status
+    if (userId && event.user_id === userId) {
+      req.event = event;
+      return next();
+    }
+    // Otherwise, only allow access to active events
+    if (event.status === 'active') {
+      req.event = event;
+      return next();
+    }
+    return res.status(403).json({
+      error: true,
+      message: 'Access denied. You do not have permission to access this event.'
+    });
   } catch (error) {
     console.error('Event access check error:', error);
     return res.status(500).json({

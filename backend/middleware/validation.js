@@ -84,14 +84,12 @@ export const validateCreateEvent = [
     .withMessage('Theme must be less than 255 characters'),
   body('rsvpContact')
     .optional()
-    .trim()
-    .matches(/^\+\d{1,3}\d{9}$/)
-    .withMessage('RSVP contact must be a valid phone number with country code and 9 digits (e.g., +255692308579)'),
+    .matches(/^\+?\d{10,15}$/)
+    .withMessage('RSVP contact must be a valid phone number with country code, 10-15 digits, with or without + (e.g., +255692308579 or 255692308579)'),
   body('rsvpContactSecondary')
     .optional()
-    .trim()
-    .matches(/^\+\d{1,3}\d{9}$/)
-    .withMessage('Secondary RSVP contact must be a valid phone number with country code and 9 digits (e.g., +255692308579)'),
+    .matches(/^\+?\d{10,15}$/)
+    .withMessage('Secondary RSVP contact must be a valid phone number with country code, 10-15 digits, with or without + (e.g., +255692308579 or 255692308579)'),
   body('additionalInfo')
     .optional()
     .trim()

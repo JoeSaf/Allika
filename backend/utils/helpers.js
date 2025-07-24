@@ -2,6 +2,10 @@ import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import QRCode from 'qrcode';
 import crypto from 'crypto';
+import pkg from 'qrcode-with-logos';
+const { createQRWithLogo } = pkg;
+import path from 'path';
+import fs from 'fs';
 
 // Generate unique ID
 export const generateId = () => uuidv4();
@@ -42,7 +46,7 @@ export const generateQRCode = async (data) => {
   }
 };
 
-// Generate QR code for guest
+// Generate QR code for guest with logo overlay
 export const generateGuestQRCode = async (guestId, eventId, rsvpToken) => {
   const qrData = {
     type: 'guest_checkin',
@@ -51,8 +55,18 @@ export const generateGuestQRCode = async (guestId, eventId, rsvpToken) => {
     token: rsvpToken,
     timestamp: Date.now()
   };
-  
-  return await generateQRCode(qrData);
+  const content = JSON.stringify(qrData);
+  const logoPath = path.resolve(process.cwd(), 'public', 'placeholder.svg');
+  const qrBuffer = await createQRWithLogo({
+    content,
+    logo: {
+      src: logoPath,
+      logoSize: 0.2
+    },
+    width: 400,
+    height: 400
+  });
+  return qrBuffer.toString('base64');
 };
 
 // Parse CSV data
@@ -337,4 +351,12 @@ export const formatDateInWords = (dateString, language = 'en') => {
     console.error('Error formatting date in words:', error);
     return dateString; // Return original if formatting fails
   }
+}; 
+
+// Generate a human-friendly RSVP alias
+export const generateRSVPAlias = (guestName, eventTitle) => {
+  // Lowercase, remove non-alphanum, replace spaces with hyphens
+  let base = `${guestName}-${eventTitle}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  // Truncate to 40 chars for safety
+  return base.slice(0, 40);
 }; 

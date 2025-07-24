@@ -87,27 +87,25 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
 
     if (messageType === 'whatsapp') {
       // WhatsApp bulk send (handle all guests at once)
-      const bulkMessages = guests.map(guest => ({
-        phone: guest.phone,
-        message: generateMessageContent(event, guest, messageType, customMessage)
-      }));
-      const tempPath = path.join('/tmp', `wa_bulk_${Date.now()}.json`);
-      fs.writeFileSync(tempPath, JSON.stringify(bulkMessages, null, 2));
-      try {
-        await new Promise((resolve, reject) => {
-          exec(`python3 send_whatsapp_bulk.py "${tempPath}"`, { cwd: path.resolve(__dirname, '../') }, (error, stdout, stderr) => {
-            if (error) return reject(stderr || error.message);
-            resolve(stdout);
+      for (const guest of guests) {
+        const phone = guest.phone;
+        const message = generateMessageContent(event, guest, messageType, customMessage);
+        const tempMsgPath = path.join('/tmp', `wa_msg_${guest.id}_${Date.now()}.txt`);
+        fs.writeFileSync(tempMsgPath, message, 'utf8');
+        try {
+          await new Promise((resolve, reject) => {
+            exec(`python3 send_whatsapp.py "${phone}" "${tempMsgPath}"`, { cwd: path.resolve(__dirname, '../') }, (error, stdout, stderr) => {
+              if (error) return reject(stderr || error.message);
+              resolve(stdout);
+            });
           });
-        });
-        // Mark all as sent
-        for (const guest of guests) {
+          // Mark as sent
           const messageId = generateId();
           await pool.execute(
             `INSERT INTO message_logs (
               id, event_id, guest_id, message_type, recipient, message_content, status, sent_at
             ) VALUES (?, ?, ?, ?, ?, ?, 'sent', CURRENT_TIMESTAMP)`,
-            [messageId, eventId, guest.id, messageType, guest.phone, generateMessageContent(event, guest, messageType, customMessage)]
+            [messageId, eventId, guest.id, messageType, guest.phone, message]
           );
           sentMessages.push({
             guestId: guest.id,
@@ -116,15 +114,13 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
             messageId,
             status: 'sent'
           });
-        }
-      } catch (waError) {
-        for (const guest of guests) {
+        } catch (waError) {
           const messageId = generateId();
           await pool.execute(
             `INSERT INTO message_logs (
               id, event_id, guest_id, message_type, recipient, message_content, status, error_message
             ) VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)`,
-            [messageId, eventId, guest.id, messageType, guest.phone, generateMessageContent(event, guest, messageType, customMessage), waError.toString()]
+            [messageId, eventId, guest.id, messageType, guest.phone, message, waError.toString()]
           );
           failedMessages.push({
             guestId: guest.id,
@@ -132,9 +128,9 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
             recipient: guest.phone,
             error: waError.toString()
           });
+        } finally {
+          fs.unlinkSync(tempMsgPath);
         }
-      } finally {
-        fs.unlinkSync(tempPath);
       }
     } else {
       // Per-guest logic for SMS/email
@@ -511,6 +507,10 @@ function generateMessageContent(event, guest, messageType, customMessage) {
     language
   });
   
+  // Use alias if available, fallback to token
+  const rsvpPath = guest.rsvp_alias ? `/rsvp/${guest.rsvp_alias}` : `/rsvp/${guest.rsvp_token}`;
+  const rsvpLink = `${process.env.FRONTEND_URL}${rsvpPath}`;
+
   // Use custom message if provided, otherwise generate default
   if (customMessage) {
     return customMessage
@@ -520,45 +520,16 @@ function generateMessageContent(event, guest, messageType, customMessage) {
       .replace(/{eventTime}/g, eventTimeInWords)
       .replace(/{receptionTime}/g, receptionTimeInWords)
       .replace(/{venue}/g, eventData.venue)
-      .replace(/{rsvpLink}/g, `${process.env.FRONTEND_URL}/rsvp/${guest.rsvp_token}`);
+      .replace(/{rsvpLink}/g, rsvpLink);
   }
 
-  // Default message templates
+  // Default message templates with improved spacing and WhatsApp formatting
   const templates = {
-    sms: `🎉 Habari ${guestName}!
+    sms: `🎉 Habari ${guestName}!\n\nTafadhali pokea mwaliko wa ${eventData.couple_name || eventData.title}, Itakayofanyika ${eventDateInWords}${eventTimeInWords ? `, ${eventTimeInWords}` : ''}, ${eventData.venue}.\n\nTafadhali bofya chaguo mojawapo hapo chini kuthibitisha ushiriki.\n\nKaribu Sana!\n\nRSVP: ${rsvpLink}\nUjumbe huu, umetumwa kwa kupitia Alika`,
 
-Tafadhali pokea mwaliko wa ${eventData.couple_name || eventData.title}, Itakayofanyika ${eventDateInWords}${eventTimeInWords ? `, ${eventTimeInWords}` : ''}, ${eventData.venue}.
+    whatsapp: `🎉 *Habari ${guestName}!*\n\nTafadhali pokea mwaliko wa *${eventData.couple_name || eventData.title}*, Itakayofanyika *${eventDateInWords}${eventTimeInWords ? `, ${eventTimeInWords}` : ''}*, ${eventData.venue}.\n\nTafadhali bofya chaguo mojawapo hapo chini kuthibitisha ushiriki.\n\n*Karibu Sana!*\n\nRSVP: ${rsvpLink}\n_Ujumbe huu, umetumwa kwa kupitia Alika_`,
 
-Tafadhali bofya chaguo mojawapo hapo chini kuthibitisha ushiriki
-
-Karibu Sana!
-
-RSVP: ${process.env.FRONTEND_URL}/rsvp/${guest.rsvp_token}
-Ujumbe huu, umetumwa kwa kupitia Alika`,
-
-    whatsapp: `🎉 Habari ${guestName}!
-
-Tafadhali pokea mwaliko wa ${eventData.couple_name || eventData.title}, Itakayofanyika ${eventDateInWords}${eventTimeInWords ? `, ${eventTimeInWords}` : ''}, ${eventData.venue}.
-
-Tafadhali bofya chaguo mojawapo hapo chini kuthibitisha ushiriki
-
-Karibu Sana!
-
-RSVP: ${process.env.FRONTEND_URL}/rsvp/${guest.rsvp_token}
-Ujumbe huu, umetumwa kwa kupitia Alika`,
-
-    email: `Dear ${guestName},
-
-You are cordially invited to ${eventData.couple_name || eventData.title} on ${eventDateInWords}${eventTimeInWords ? ` at ${eventTimeInWords}` : ''} at ${eventData.venue}.
-
-Please click the link below to RSVP:
-
-${process.env.FRONTEND_URL}/rsvp/${guest.rsvp_token}
-
-We look forward to celebrating with you!
-
-Best regards,
-The Event Organizers`
+    email: `Dear ${guestName},\n\nYou are cordially invited to ${eventData.couple_name || eventData.title} on ${eventDateInWords}${eventTimeInWords ? ` at ${eventTimeInWords}` : ''} at ${eventData.venue}.\n\nPlease click the link below to RSVP:\n\n${rsvpLink}\n\nWe look forward to celebrating with you!\n\nBest regards,\nThe Event Organizers`
   };
 
   return templates[messageType] || templates.sms;

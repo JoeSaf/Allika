@@ -63,8 +63,8 @@ for idx, guest in enumerate(guests):
     message = guest['message']
     print(f"[{idx+1}/{len(guests)}] Sending to {phone}...")
     try:
-        # Open chat with phone number
-        url = f'https://web.whatsapp.com/send?phone={phone}&text={message}'
+        # Open chat with phone number (no prefilled message)
+        url = f'https://web.whatsapp.com/send?phone={phone}'
         driver.get(url)
         # Wait for chat box
         for _ in range(30):
@@ -76,7 +76,12 @@ for idx, guest in enumerate(guests):
         else:
             print(f"  [!] Could not find input box for {phone}")
             continue
-        # Sometimes the message is prefilled, sometimes not. Click and send Enter.
+        # Paste the message line by line, using SHIFT+ENTER for newlines
+        lines = message.splitlines()
+        for i, line in enumerate(lines):
+            if i > 0:
+                input_box.send_keys(Keys.SHIFT + Keys.ENTER)
+            input_box.send_keys(line)
         input_box.send_keys(Keys.ENTER)
         print(f"  [✓] Sent to {phone}")
         time.sleep(3)  # Wait a bit before next message

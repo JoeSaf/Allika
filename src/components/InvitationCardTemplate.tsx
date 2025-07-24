@@ -117,7 +117,7 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
       <div className="mb-6 text-center border-t border-slate-600 pt-6">
         <div className="bg-white rounded-lg p-4 inline-block">
           {qrCode ? (
-            <img src={qrCode} alt="Check-in QR Code" className="w-32 h-32" />
+            <img src={`data:image/png;base64,${qrCode}`} alt="Check-in QR Code" className="w-32 h-32" />
           ) : (
             <div className="w-32 h-32 bg-slate-200 rounded flex items-center justify-center">
               <QrCode className="w-16 h-16 text-slate-400" />

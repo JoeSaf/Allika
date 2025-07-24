@@ -275,6 +275,13 @@ const createTables = async () => {
       )
     `);
 
+    // Ensure rsvp_alias column exists in guests table (for RSVP alias system)
+    const [rsvpAliasCol] = await connection.execute(`SHOW COLUMNS FROM guests LIKE 'rsvp_alias'`);
+    if (rsvpAliasCol.length === 0) {
+      await connection.execute(`ALTER TABLE guests ADD COLUMN rsvp_alias VARCHAR(255) UNIQUE`);
+      console.log('✅ Added rsvp_alias column to guests table');
+    }
+
     // RSVP responses table
     await connection.execute(`
       CREATE TABLE IF NOT EXISTS rsvp_responses (

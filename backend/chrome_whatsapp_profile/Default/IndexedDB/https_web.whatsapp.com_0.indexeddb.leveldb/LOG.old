@@ -1,42 +1,35 @@
-2025/07/22-22:40:37.901 91c2 Reusing MANIFEST /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2025/07/22-22:40:37.902 91c2 Recovering log #375
-2025/07/22-22:40:37.925 91c2 Reusing old log /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000375.log 
-2025/07/22-22:40:37.925 91c2 Delete type=2 #374
-2025/07/22-22:40:37.926 91c2 Delete type=2 #373
-2025/07/22-22:40:50.487 91c2 Level-0 table #381: started
-2025/07/22-22:40:50.506 91c2 Level-0 table #381: 283230 bytes OK
-2025/07/22-22:40:50.511 91c2 Delete type=0 #375
-2025/07/22-22:40:50.512 91c2 Manual compaction at level-0 from '\x00\x86\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x87\x00\x00\x00' @ 0 : 0; will stop at '\x00\x86\x00\x00\x05' @ 360369 : 1
-2025/07/22-22:40:50.512 91c2 Compacting 1@0 + 2@1 files
-2025/07/22-22:40:50.841 91c2 Generated table #382@0: 145627 keys, 2310765 bytes
-2025/07/22-22:40:50.947 91c2 Generated table #383@0: 21588 keys, 1308799 bytes
-2025/07/22-22:40:50.950 91c2 Compacted 1@0 + 2@1 files => 3619564 bytes
-2025/07/22-22:40:50.952 91c2 compacted to: files[ 0 2 1 0 0 0 0 ]
-2025/07/22-22:40:50.953 91c2 Delete type=2 #381
-2025/07/22-22:40:50.958 91c2 Manual compaction at level-0 from '\x00\x86\x00\x00\x05' @ 360369 : 1 .. '\x00\x87\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/07/22-22:41:06.152 91d8 Level-0 table #385: started
-2025/07/22-22:41:06.180 91d8 Level-0 table #385: 203148 bytes OK
-2025/07/22-22:41:06.188 91d8 Delete type=2 #378
-2025/07/22-22:41:06.188 91d8 Delete type=2 #377
-2025/07/22-22:41:06.188 91d8 Delete type=0 #380
-2025/07/22-22:41:06.189 91c2 Manual compaction at level-0 from '\x00\x87\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x88\x00\x00\x00' @ 0 : 0; will stop at '\x00\x87\x00\x00\x05' @ 367794 : 1
-2025/07/22-22:41:06.190 91c2 Compacting 1@0 + 2@1 files
-2025/07/22-22:41:06.391 91c2 Generated table #386@0: 148085 keys, 2314704 bytes
-2025/07/22-22:41:06.565 91c2 Generated table #387@0: 21990 keys, 1348220 bytes
-2025/07/22-22:41:06.568 91c2 Compacted 1@0 + 2@1 files => 3662924 bytes
-2025/07/22-22:41:06.575 91c2 compacted to: files[ 0 2 1 0 0 0 0 ]
-2025/07/22-22:41:06.575 91c2 Delete type=2 #385
-2025/07/22-22:41:06.578 91c2 Manual compaction at level-0 from '\x00\x87\x00\x00\x05' @ 367794 : 1 .. '\x00\x88\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/07/22-22:41:22.475 91d6 Level-0 table #389: started
-2025/07/22-22:41:22.522 91d6 Level-0 table #389: 213753 bytes OK
-2025/07/22-22:41:22.528 91d6 Delete type=2 #382
-2025/07/22-22:41:22.529 91d6 Delete type=2 #383
-2025/07/22-22:41:22.529 91d6 Delete type=0 #384
-2025/07/22-22:41:22.546 91c2 Manual compaction at level-0 from '\x00\x88\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x89\x00\x00\x00' @ 0 : 0; will stop at '\x00\x88\x00\x00\x05' @ 375115 : 1
-2025/07/22-22:41:22.547 91c2 Compacting 1@0 + 2@1 files
-2025/07/22-22:41:22.883 91c2 Generated table #390@0: 150996 keys, 2317140 bytes
-2025/07/22-22:41:23.068 91c2 Generated table #391@0: 22435 keys, 1396083 bytes
-2025/07/22-22:41:23.069 91c2 Compacted 1@0 + 2@1 files => 3713223 bytes
-2025/07/22-22:41:23.078 91c2 compacted to: files[ 0 2 1 0 0 0 0 ]
-2025/07/22-22:41:23.079 91c2 Delete type=2 #389
-2025/07/22-22:41:23.080 91c2 Manual compaction at level-0 from '\x00\x88\x00\x00\x05' @ 375115 : 1 .. '\x00\x89\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/07/24-11:48:34.126 e701 Reusing MANIFEST /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/07/24-11:48:34.127 e701 Recovering log #407
+2025/07/24-11:48:34.133 e701 Reusing old log /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000407.log 
+2025/07/24-11:48:39.149 e704 Level-0 table #413: started
+2025/07/24-11:48:39.155 e704 Level-0 table #413: 85022 bytes OK
+2025/07/24-11:48:39.161 e704 Delete type=0 #407
+2025/07/24-11:48:39.163 e704 Manual compaction at level-0 from '\x00\x8d\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x8e\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/07/24-11:48:42.005 e704 Compacting 1@1 + 2@2 files
+2025/07/24-11:48:42.102 e704 Generated table #414@1: 48370 keys, 2198062 bytes
+2025/07/24-11:48:42.148 e704 Generated table #415@1: 15098 keys, 685357 bytes
+2025/07/24-11:48:42.149 e704 Compacted 1@1 + 2@2 files => 2883419 bytes
+2025/07/24-11:48:42.153 e704 compacted to: files[ 0 0 2 0 0 0 0 ]
+2025/07/24-11:48:42.154 e704 Delete type=2 #409
+2025/07/24-11:48:42.154 e704 Delete type=2 #410
+2025/07/24-11:48:42.154 e704 Delete type=2 #413
+2025/07/24-11:48:44.486 e704 Level-0 table #417: started
+2025/07/24-11:48:44.492 e704 Level-0 table #417: 21099 bytes OK
+2025/07/24-11:48:44.497 e704 Delete type=0 #412
+2025/07/24-11:48:44.498 e701 Manual compaction at level-0 from '\x00\x8e\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x8f\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/07/24-11:48:44.515 e704 Compacting 1@1 + 2@2 files
+2025/07/24-11:48:44.734 e704 Generated table #418@1: 48441 keys, 2198870 bytes
+2025/07/24-11:48:44.812 e704 Generated table #419@1: 15098 keys, 685357 bytes
+2025/07/24-11:48:44.812 e704 Compacted 1@1 + 2@2 files => 2884227 bytes
+2025/07/24-11:48:44.814 e704 compacted to: files[ 0 0 2 0 0 0 0 ]
+2025/07/24-11:48:44.814 e704 Delete type=2 #414
+2025/07/24-11:48:44.814 e704 Delete type=2 #415
+2025/07/24-11:48:44.814 e704 Delete type=2 #417
+2025/07/24-11:48:54.036 e701 Level-0 table #421: started
+2025/07/24-11:48:54.124 e701 Level-0 table #421: 1633322 bytes OK
+2025/07/24-11:48:54.128 e701 Delete type=0 #416
+2025/07/24-11:48:54.271 e701 Compacting 1@1 + 2@2 files
+2025/07/24-11:48:54.464 e701 Generated table #422@1: 51007 keys, 2204247 bytes
+2025/07/24-11:48:54.559 e701 Generated table #423@1: 17918 keys, 1047034 bytes
+2025/07/24-11:48:54.559 e701 Compacted 1@1 + 2@2 files => 3251281 bytes
+2025/07/24-11:48:54.566 e701 compacted to: files[ 0 0 2 0 0 0 0 ]

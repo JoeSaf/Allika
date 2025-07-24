@@ -118,6 +118,7 @@ const Dashboard = () => {
     try {
       // Store the current event ID in localStorage for the template editor
       localStorage.setItem('alika_current_event', id);
+      console.log('[Dashboard] Navigating to template editor with event ID:', id);
       navigate(`/template/${id}`);
     } catch (error) {
       console.error('Error setting current event:', error);
@@ -154,7 +155,7 @@ const Dashboard = () => {
 
   const handleModalClose = () => {
     setShowCreateModal(false);
-    // Reload events after modal closes (in case an event was created)
+    // Only reload events, do not navigate to template editor here
     loadEvents();
   };
 

@@ -78,6 +78,7 @@ const FeaturedTemplates = () => {
       // Users can customize them later in the template editor if needed
       // Store the current event ID in localStorage for the template editor
       localStorage.setItem('alika_current_event', newEvent.id);
+      console.log('[FeaturedTemplates] Navigating to template editor with event ID:', newEvent.id);
       navigate(`/template/${newEvent.id}?template=${template.id}`);
     } catch (error) {
       console.error('Error creating event:', error);

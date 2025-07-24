@@ -9,7 +9,7 @@ import { QrCode, Camera, Users, CheckCircle, X, Search, AlertCircle, CameraOff, 
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { checkInGuestQr, getEvent, getGuests } from '@/services/api';
-import { isUserLoggedIn } from '@/utils/auth';
+import { isUserLoggedIn, getCurrentUser } from '@/utils/auth';
 import jsQR from 'jsqr';
 
 interface Guest {
@@ -95,8 +95,8 @@ const QrScanner = () => {
       setCurrentEvent(event);
       
       // Get current user info to check ownership
-      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      if (event.user_id !== currentUser.id) {
+      const currentUser = getCurrentUser();
+      if (!currentUser || event.user_id !== currentUser.id) {
         setAccessDenied(true);
         return;
       }

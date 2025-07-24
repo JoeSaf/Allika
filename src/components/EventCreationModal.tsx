@@ -61,7 +61,8 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dateLang, setDateLang] = useState<'en' | 'sw'>('en');
-  const phoneRegex = /^\+\d{1,3}\d{9}$/;
+  // Accept phone numbers with or without +, and validate length (10-15 digits)
+  const phoneRegex = /^\+?\d{10,15}$/;
   const [rsvpContactError, setRsvpContactError] = useState('');
   const [rsvpContactSecondaryError, setRsvpContactSecondaryError] = useState('');
 
@@ -86,10 +87,18 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
       [name]: value
     }));
     if (name === 'rsvpContact') {
-      setRsvpContactError(value && !phoneRegex.test(value) ? 'Invalid phone. Use +countrycode and 9 digits.' : '');
+      setRsvpContactError(
+        value && !phoneRegex.test(value)
+          ? 'Please enter a valid phone number (10-15 digits, with or without +).'
+          : ''
+      );
     }
     if (name === 'rsvpContactSecondary') {
-      setRsvpContactSecondaryError(value && !phoneRegex.test(value) ? 'Invalid phone. Use +countrycode and 9 digits.' : '');
+      setRsvpContactSecondaryError(
+        value && !phoneRegex.test(value)
+          ? 'Please enter a valid phone number (10-15 digits, with or without +).'
+          : ''
+      );
     }
   };
 
@@ -140,7 +149,6 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
         reception: formData.reception || null,
         theme: formData.theme || null,
         rsvpContact: formData.rsvpContact || null,
-        rsvpContactSecondary: formData.rsvpContactSecondary || null,
         additionalInfo: formData.description || null,
         invitingFamily: formData.invitingFamily || null,
         ...(formData.receptionTime ? { receptionTime: formData.receptionTime.slice(0, 5) } : {}),
@@ -158,13 +166,31 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
       localStorage.setItem('alika_current_event', newEvent.id);
       toast({
         title: "Event Created!",
-        description: `Your ${formData.type} event "${formData.name}" has been created successfully.`,
+        description: `Your ${formData.type} event \"${formData.name}\" has been created successfully.`,
       });
-      resetForm();
-      onOpenChange(false);
+      console.log('[EventCreationModal] Navigating to template editor with event ID:', newEvent.id);
+      navigate(`/template/${newEvent.id}`, {
+        state: {
+          eventDetails: {
+            name: formData.name,
+            type: formData.type,
+            description: formData.description,
+            venue: formData.venue,
+            date: formData.date,
+            invitingFamily: formData.invitingFamily,
+            reception: formData.reception,
+            receptionTime: formData.receptionTime,
+            theme: formData.theme,
+            rsvpContact: formData.rsvpContact,
+            dateLang: dateLang
+          }
+        }
+      });
+      // Only close the modal after navigation
       setTimeout(() => {
-        navigate('/dashboard');
-      }, 100);
+        resetForm();
+        onOpenChange(false);
+      }, 200);
     } catch (error) {
       console.error('Error creating event:', error);
       toast({
@@ -325,21 +351,6 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
               disabled={isSubmitting}
             />
             {rsvpContactError && <div className="text-red-400 text-xs mt-1">{rsvpContactError}</div>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="rsvpContactSecondary" className="text-slate-300">Secondary RSVP Contact (Phone Number)</Label>
-            <Input
-              id="rsvpContactSecondary"
-              name="rsvpContactSecondary"
-              type="tel"
-              placeholder="e.g., +255 987 654 321"
-              value={formData.rsvpContactSecondary}
-              onChange={handleInputChange}
-              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
-              disabled={isSubmitting}
-            />
-            {rsvpContactSecondaryError && <div className="text-red-400 text-xs mt-1">{rsvpContactSecondaryError}</div>}
           </div>
 
           <div className="flex gap-3 pt-4">

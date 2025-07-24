@@ -15,7 +15,8 @@ import {
   Phone, 
   Plus, 
   Search, 
-  Scan
+  Scan,
+  ArrowLeft
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -60,6 +61,7 @@ interface Event {
   description?: string;
   theme?: string;
   rsvp_enabled?: boolean;
+  time?: string; // Added time field
 }
 
 const ViewAnalytics = () => {
@@ -75,6 +77,7 @@ const ViewAnalytics = () => {
   const [showAddGuestModal, setShowAddGuestModal] = useState(false);
   const [showSendInvitationModal, setShowSendInvitationModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   
 
 
@@ -171,25 +174,34 @@ const ViewAnalytics = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-white mb-2">{event.title}</h1>
-              <p className="text-slate-300">{event.date} • {event.venue}</p>
+    <>
+      <div className="min-h-screen bg-slate-900">
+        <div className="container mx-auto px-4 py-8 pt-24">
+          <div className="flex items-center gap-4 mb-8 justify-between">
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/dashboard')}
+                className="border-slate-600 text-slate-300 hover:bg-slate-700"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Dashboard
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold text-white">Event Analytics</h1>
+                <p className="text-slate-300">Event: {event.title}</p>
+              </div>
             </div>
             <div className="flex gap-3">
-              <Button onClick={() => navigate(`/qr-scanner/${eventId}`)} className="bg-teal-600 hover:bg-teal-700">
+              <Button onClick={() => navigate(`/qr-scanner/${eventId}`)} className="bg-teal-600 hover:bg-teal-700 text-white">
                 <Scan className="w-4 h-4 mr-2" />
                 QR Scanner
               </Button>
-              <Button onClick={() => setShowAddGuestModal(true)}>
+              <Button onClick={() => setShowAddGuestModal(true)} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-700">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Guest
               </Button>
-              <Button onClick={() => setShowSendInvitationModal(true)} variant="outline">
+              <Button onClick={() => setShowSendInvitationModal(true)} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-700">
                 <Mail className="w-4 h-4 mr-2" />
                 Send Invitations
               </Button>
@@ -327,7 +339,7 @@ const ViewAnalytics = () => {
           template={selectedTemplate}
         />
       </div>
-    </div>
+    </>
   );
 };
 

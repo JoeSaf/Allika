@@ -4,7 +4,7 @@ import XLSX from 'xlsx';
 import { getPool } from '../config/database.js';
 import { authenticateToken, requireEventOwnership } from '../middleware/auth.js';
 import { validateCreateGuest, validateBulkGuestUpload, validateUUID, validateEventId } from '../middleware/validation.js';
-import { generateId, generateRSVPToken, generateGuestQRCode, parseCSVData, formatPhoneNumber } from '../utils/helpers.js';
+import { generateId, generateRSVPToken, generateGuestQRCode, parseCSVData, formatPhoneNumber, generateRSVPAlias } from '../utils/helpers.js';
 
 const router = express.Router();
 
@@ -60,6 +60,18 @@ router.post('/:eventId', validateEventId, requireEventOwnership, validateCreateG
     const guestId = generateId();
     const rsvpToken = generateRSVPToken();
 
+    // Generate a unique RSVP alias
+    let baseAlias = generateRSVPAlias(name, eventId);
+    let alias = baseAlias;
+    let aliasIndex = 1;
+    while (true) {
+      const [existingAlias] = await pool.execute('SELECT id FROM guests WHERE rsvp_alias = ?', [alias]);
+      if (existingAlias.length === 0) break;
+      alias = `${baseAlias}-${Math.floor(Math.random()*10000)}`;
+      aliasIndex++;
+      if (aliasIndex > 10) { alias = `${baseAlias}-${guestId.slice(0, 6)}`; break; }
+    }
+
     // Format phone number if provided
     const formattedPhone = phone ? formatPhoneNumber(phone) : null;
 
@@ -67,8 +79,8 @@ router.post('/:eventId', validateEventId, requireEventOwnership, validateCreateG
     await pool.execute(
       `INSERT INTO guests (
         id, event_id, name, email, phone, table_number, guest_count,
-        special_requests, rsvp_token
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        special_requests, rsvp_token, rsvp_alias
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         guestId,
         eventId,
@@ -78,7 +90,8 @@ router.post('/:eventId', validateEventId, requireEventOwnership, validateCreateG
         tableNumber ?? null,
         guestCount ?? 1,
         specialRequests ?? null,
-        rsvpToken
+        rsvpToken,
+        alias
       ]
     );
 
@@ -214,6 +227,18 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
         const guestId = generateId();
         const rsvpToken = generateRSVPToken();
 
+        // Generate a unique RSVP alias
+        let baseAlias = generateRSVPAlias(guest.name, eventId);
+        let alias = baseAlias;
+        let aliasIndex = 1;
+        while (true) {
+          const [existingAlias] = await pool.execute('SELECT id FROM guests WHERE rsvp_alias = ?', [alias]);
+          if (existingAlias.length === 0) break;
+          alias = `${baseAlias}-${Math.floor(Math.random()*10000)}`;
+          aliasIndex++;
+          if (aliasIndex > 10) { alias = `${baseAlias}-${guestId.slice(0, 6)}`; break; }
+        }
+
         console.log(`Processing guest ${i + 1}:`, { name: guest.name, phone: guest.phone });
 
         // Format phone number if provided
@@ -224,8 +249,8 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
         await pool.execute(
           `INSERT INTO guests (
             id, event_id, name, email, phone, table_number, guest_count,
-            special_requests, rsvp_token
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            special_requests, rsvp_token, rsvp_alias
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             guestId, 
             eventId, 
@@ -235,7 +260,8 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
             guest.tableNumber || null, 
             guest.guestCount || 1, 
             guest.specialRequests || null, 
-            rsvpToken
+            rsvpToken,
+            alias
           ]
         );
 
@@ -358,6 +384,18 @@ router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, uplo
         const guestId = generateId();
         const rsvpToken = generateRSVPToken();
 
+        // Generate a unique RSVP alias
+        let baseAlias = generateRSVPAlias(guest.name, eventId);
+        let alias = baseAlias;
+        let aliasIndex = 1;
+        while (true) {
+          const [existingAlias] = await pool.execute('SELECT id FROM guests WHERE rsvp_alias = ?', [alias]);
+          if (existingAlias.length === 0) break;
+          alias = `${baseAlias}-${Math.floor(Math.random()*10000)}`;
+          aliasIndex++;
+          if (aliasIndex > 10) { alias = `${baseAlias}-${guestId.slice(0, 6)}`; break; }
+        }
+
         // Format phone number if provided
         const formattedPhone = guest.phone ? formatPhoneNumber(guest.phone) : null;
 
@@ -365,8 +403,8 @@ router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, uplo
         await pool.execute(
           `INSERT INTO guests (
             id, event_id, name, email, phone, table_number, guest_count,
-            special_requests, rsvp_token
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            special_requests, rsvp_token, rsvp_alias
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             guestId, 
             eventId, 
@@ -376,7 +414,8 @@ router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, uplo
             guest.tableNumber || null, 
             guest.guestCount || 1, 
             guest.specialRequests || null, 
-            rsvpToken
+            rsvpToken,
+            alias
           ]
         );
 

@@ -8,13 +8,13 @@ import { v4 as uuidv4 } from 'uuid';
 const router = express.Router();
 
 // GET /api/rsvp/:token - Get RSVP info (public)
-router.get('/:token', async (req, res) => {
+router.get('/:tokenOrAlias', async (req, res) => {
   try {
-    const { token } = req.params;
+    const { tokenOrAlias } = req.params;
     const pool = getPool();
 
-    // Get guest and event info
-    const [guests] = await pool.execute(
+    // Try to find guest by alias first, then fallback to token
+    let [guests] = await pool.execute(
       `SELECT g.*, e.title as event_title, e.date as event_date, e.time as event_time,
               e.venue as event_venue, e.reception as event_reception, e.reception_time as event_reception_time,
               e.theme as event_theme, e.rsvp_contact as event_rsvp_contact,
@@ -27,9 +27,28 @@ router.get('/:token', async (req, res) => {
        FROM guests g
        JOIN events e ON g.event_id = e.id
        LEFT JOIN rsvp_settings rs ON e.id = rs.event_id
-       WHERE g.rsvp_token = ? AND e.status = 'active'`,
-      [token]
+       WHERE g.rsvp_alias = ? AND e.status = 'active'`,
+      [tokenOrAlias]
     );
+    if (guests.length === 0) {
+      // Fallback to token
+      [guests] = await pool.execute(
+        `SELECT g.*, e.title as event_title, e.date as event_date, e.time as event_time,
+                e.venue as event_venue, e.reception as event_reception, e.reception_time as event_reception_time,
+                e.theme as event_theme, e.rsvp_contact as event_rsvp_contact,
+                rs.title as rsvp_title, rs.subtitle as rsvp_subtitle, rs.location as rsvp_location,
+                rs.welcome_message, rs.confirm_text, rs.decline_text, rs.guest_count_enabled,
+                rs.guest_count_label, rs.guest_count_options, rs.special_requests_enabled,
+                rs.special_requests_label, rs.special_requests_placeholder, rs.additional_fields,
+                rs.submit_button_text, rs.thank_you_message, rs.background_color, rs.text_color,
+                rs.button_color, rs.accent_color, rs.rsvp_contact
+         FROM guests g
+         JOIN events e ON g.event_id = e.id
+         LEFT JOIN rsvp_settings rs ON e.id = rs.event_id
+         WHERE g.rsvp_token = ? AND e.status = 'active'`,
+        [tokenOrAlias]
+      );
+    }
 
     if (guests.length === 0) {
       return res.status(404).json({
@@ -120,20 +139,29 @@ router.get('/:token', async (req, res) => {
 });
 
 // POST /api/rsvp/:token - Submit RSVP response
-router.post('/:token', validateRSVPResponse, async (req, res) => {
+router.post('/:tokenOrAlias', validateRSVPResponse, async (req, res) => {
   try {
-    const { token } = req.params;
+    const { tokenOrAlias } = req.params;
     const { response, guestCount, specialRequests, additionalFields } = req.body;
     const pool = getPool();
 
-    // Get guest info
-    const [guests] = await pool.execute(
+    // Try to find guest by alias first, then fallback to token
+    let [guests] = await pool.execute(
       `SELECT g.*, e.id as event_id, e.status as event_status
        FROM guests g
        JOIN events e ON g.event_id = e.id
-       WHERE g.rsvp_token = ? AND e.status = 'active'`,
-      [token]
+       WHERE g.rsvp_alias = ? AND e.status = 'active'`,
+      [tokenOrAlias]
     );
+    if (guests.length === 0) {
+      [guests] = await pool.execute(
+        `SELECT g.*, e.id as event_id, e.status as event_status
+         FROM guests g
+         JOIN events e ON g.event_id = e.id
+         WHERE g.rsvp_token = ? AND e.status = 'active'`,
+        [tokenOrAlias]
+      );
+    }
 
     if (guests.length === 0) {
       return res.status(404).json({
