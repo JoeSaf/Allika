@@ -1,35 +1,19 @@
-2025/07/24-11:48:34.126 e701 Reusing MANIFEST /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2025/07/24-11:48:34.127 e701 Recovering log #407
-2025/07/24-11:48:34.133 e701 Reusing old log /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000407.log 
-2025/07/24-11:48:39.149 e704 Level-0 table #413: started
-2025/07/24-11:48:39.155 e704 Level-0 table #413: 85022 bytes OK
-2025/07/24-11:48:39.161 e704 Delete type=0 #407
-2025/07/24-11:48:39.163 e704 Manual compaction at level-0 from '\x00\x8d\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x8e\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/07/24-11:48:42.005 e704 Compacting 1@1 + 2@2 files
-2025/07/24-11:48:42.102 e704 Generated table #414@1: 48370 keys, 2198062 bytes
-2025/07/24-11:48:42.148 e704 Generated table #415@1: 15098 keys, 685357 bytes
-2025/07/24-11:48:42.149 e704 Compacted 1@1 + 2@2 files => 2883419 bytes
-2025/07/24-11:48:42.153 e704 compacted to: files[ 0 0 2 0 0 0 0 ]
-2025/07/24-11:48:42.154 e704 Delete type=2 #409
-2025/07/24-11:48:42.154 e704 Delete type=2 #410
-2025/07/24-11:48:42.154 e704 Delete type=2 #413
-2025/07/24-11:48:44.486 e704 Level-0 table #417: started
-2025/07/24-11:48:44.492 e704 Level-0 table #417: 21099 bytes OK
-2025/07/24-11:48:44.497 e704 Delete type=0 #412
-2025/07/24-11:48:44.498 e701 Manual compaction at level-0 from '\x00\x8e\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x8f\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/07/24-11:48:44.515 e704 Compacting 1@1 + 2@2 files
-2025/07/24-11:48:44.734 e704 Generated table #418@1: 48441 keys, 2198870 bytes
-2025/07/24-11:48:44.812 e704 Generated table #419@1: 15098 keys, 685357 bytes
-2025/07/24-11:48:44.812 e704 Compacted 1@1 + 2@2 files => 2884227 bytes
-2025/07/24-11:48:44.814 e704 compacted to: files[ 0 0 2 0 0 0 0 ]
-2025/07/24-11:48:44.814 e704 Delete type=2 #414
-2025/07/24-11:48:44.814 e704 Delete type=2 #415
-2025/07/24-11:48:44.814 e704 Delete type=2 #417
-2025/07/24-11:48:54.036 e701 Level-0 table #421: started
-2025/07/24-11:48:54.124 e701 Level-0 table #421: 1633322 bytes OK
-2025/07/24-11:48:54.128 e701 Delete type=0 #416
-2025/07/24-11:48:54.271 e701 Compacting 1@1 + 2@2 files
-2025/07/24-11:48:54.464 e701 Generated table #422@1: 51007 keys, 2204247 bytes
-2025/07/24-11:48:54.559 e701 Generated table #423@1: 17918 keys, 1047034 bytes
-2025/07/24-11:48:54.559 e701 Compacted 1@1 + 2@2 files => 3251281 bytes
-2025/07/24-11:48:54.566 e701 compacted to: files[ 0 0 2 0 0 0 0 ]
+2025/07/26-17:31:47.647 b33e Reusing MANIFEST /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/07/26-17:31:47.659 b33e Recovering log #780
+2025/07/26-17:31:47.741 b33e Reusing old log /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000780.log 
+2025/07/26-17:31:51.138 b340 Level-0 table #788: started
+2025/07/26-17:31:51.191 b340 Level-0 table #788: 241212 bytes OK
+2025/07/26-17:31:51.194 b340 Delete type=0 #780
+2025/07/26-17:31:51.203 b33f Manual compaction at level-0 from '\x00\xee\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\xef\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/07/26-17:31:54.021 b33e Compacting 1@1 + 4@2 files
+2025/07/26-17:31:54.131 b33e Generated table #789@1: 61619 keys, 2217867 bytes
+2025/07/26-17:31:54.230 b33e Generated table #790@1: 9273 keys, 2165004 bytes
+2025/07/26-17:31:54.366 b33e Generated table #791@1: 28600 keys, 2159429 bytes
+2025/07/26-17:31:54.521 b33e Generated table #792@1: 35411 keys, 552311 bytes
+2025/07/26-17:31:54.521 b33e Compacted 1@1 + 4@2 files => 7094611 bytes
+2025/07/26-17:31:54.523 b33e compacted to: files[ 0 0 4 0 0 0 0 ]
+2025/07/26-17:31:54.524 b33e Delete type=2 #783
+2025/07/26-17:31:54.525 b33e Delete type=2 #788
+2025/07/26-17:31:54.525 b33e Delete type=2 #785
+2025/07/26-17:31:54.525 b33e Delete type=2 #784
+2025/07/26-17:31:54.525 b33e Delete type=2 #782

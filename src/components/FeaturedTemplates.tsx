@@ -1,57 +1,57 @@
 
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import Header from '@/components/Header';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Heart, Gift, Sparkles, ArrowLeft } from 'lucide-react';
-import { createEvent, updateRsvpSettings } from '@/services/api';
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import Header from "@/components/Header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Heart, Gift, Sparkles, ArrowLeft } from "lucide-react";
+import { createEvent, updateRsvpSettings } from "@/services/api";
 
-import { isUserLoggedIn, requireLogin } from '@/utils/auth';
+import { isUserLoggedIn, requireLogin } from "@/utils/auth";
 
 const FeaturedTemplates = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const category = searchParams.get('category');
+  const category = searchParams.get("category");
 
   const templates = [
     {
-      id: 'template1',
-      name: 'Classic Portrait',
-      type: 'wedding',
-      category: 'weddings',
-      description: 'Traditional vertical layout with centered content',
-      image: '/placeholder.svg',
+      id: "template1",
+      name: "Classic Portrait",
+      type: "wedding",
+      category: "weddings",
+      description: "Traditional vertical layout with centered content",
+      image: "/placeholder.svg",
       icon: Heart,
-      color: 'from-pink-500 to-rose-500',
-      tags: ['Classic', 'Elegant', 'Traditional']
+      color: "from-pink-500 to-rose-500",
+      tags: ["Classic", "Elegant", "Traditional"],
     },
     {
-      id: 'template2',
-      name: 'Modern Landscape',
-      type: 'birthday',
-      category: 'parties',
-      description: 'Horizontal layout with image and text side by side',
-      image: '/placeholder.svg',
+      id: "template2",
+      name: "Modern Landscape",
+      type: "birthday",
+      category: "parties",
+      description: "Horizontal layout with image and text side by side",
+      image: "/placeholder.svg",
       icon: Gift,
-      color: 'from-blue-500 to-purple-500',
-      tags: ['Modern', 'Clean', 'Professional']
+      color: "from-blue-500 to-purple-500",
+      tags: ["Modern", "Clean", "Professional"],
     },
     {
-      id: 'template3',
-      name: 'Artistic Layout',
-      type: 'awards',
-      category: 'awards',
-      description: 'Creative asymmetric design with dynamic positioning',
-      image: '/placeholder.svg',
+      id: "template3",
+      name: "Artistic Layout",
+      type: "awards",
+      category: "awards",
+      description: "Creative asymmetric design with dynamic positioning",
+      image: "/placeholder.svg",
       icon: Sparkles,
-      color: 'from-amber-500 to-orange-500',
-      tags: ['Creative', 'Artistic', 'Dynamic']
-    }
+      color: "from-amber-500 to-orange-500",
+      tags: ["Creative", "Artistic", "Dynamic"],
+    },
   ];
 
-  const filteredTemplates = category 
+  const filteredTemplates = category
     ? templates.filter(template => template.category === category)
     : templates;
 
@@ -66,22 +66,24 @@ const FeaturedTemplates = () => {
       const eventPayload = {
         title: `New ${template.name}`,
         type: template.type,
-        date: '',
-        time: '',
-        venue: '',
-        additionalInfo: ''
+        date: "",
+        time: "",
+        venue: "",
+        additionalInfo: "",
       };
       const res = await createEvent(eventPayload);
-      if (!res || !res.data || !res.data.event) throw new Error('Event creation failed');
+      if (!res || !res.data || !res.data.event) {
+        throw new Error("Event creation failed");
+      }
       const newEvent = res.data.event;
       // Note: RSVP settings are already created by the backend with appropriate defaults
       // Users can customize them later in the template editor if needed
       // Store the current event ID in localStorage for the template editor
-      localStorage.setItem('alika_current_event', newEvent.id);
-      console.log('[FeaturedTemplates] Navigating to template editor with event ID:', newEvent.id);
+      localStorage.setItem("alika_current_event", newEvent.id);
+      console.log("[FeaturedTemplates] Navigating to template editor with event ID:", newEvent.id);
       navigate(`/template/${newEvent.id}?template=${template.id}`);
     } catch (error) {
-      console.error('Error creating event:', error);
+      console.error("Error creating event:", error);
       // Optionally show a toast or error message
     }
   };
@@ -89,13 +91,13 @@ const FeaturedTemplates = () => {
   return (
     <div className="min-h-screen bg-slate-900">
       <Header />
-      
+
       <div className="container mx-auto px-4 py-8 pt-24">
         <div className="flex items-center gap-4 mb-8">
           {category && (
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/templates')}
+            <Button
+              variant="outline"
+              onClick={() => navigate("/templates")}
               className="border-slate-600 text-slate-300 hover:bg-slate-700"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -104,7 +106,7 @@ const FeaturedTemplates = () => {
           )}
           <div>
             <h1 className="text-4xl font-bold text-white mb-2">
-              {category ? `${category.charAt(0).toUpperCase() + category.slice(1)} Templates` : 'Choose a Template'}
+              {category ? `${category.charAt(0).toUpperCase() + category.slice(1)} Templates` : "Choose a Template"}
             </h1>
             <p className="text-slate-300">Select a template to start creating your invitation</p>
           </div>
@@ -115,8 +117,8 @@ const FeaturedTemplates = () => {
             <CardContent className="text-center py-12">
               <h3 className="text-xl font-semibold text-slate-400 mb-2">No templates found</h3>
               <p className="text-slate-500 mb-6">No templates available for this category</p>
-              <Button 
-                onClick={() => navigate('/templates')}
+              <Button
+                onClick={() => navigate("/templates")}
                 className="bg-teal-600 hover:bg-teal-700"
               >
                 View All Templates
@@ -144,7 +146,7 @@ const FeaturedTemplates = () => {
                         </Badge>
                       ))}
                     </div>
-                    <Button 
+                    <Button
                       onClick={() => handleSelectTemplate(template)}
                       className="w-full bg-teal-600 hover:bg-teal-700"
                     >

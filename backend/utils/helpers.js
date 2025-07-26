@@ -2,8 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import QRCode from 'qrcode';
 import crypto from 'crypto';
-import pkg from 'qrcode-with-logos';
-const { createQRWithLogo } = pkg;
+import createQRWithLogo from 'qrcode-with-logos';
 import path from 'path';
 import fs from 'fs';
 
@@ -55,18 +54,8 @@ export const generateGuestQRCode = async (guestId, eventId, rsvpToken) => {
     token: rsvpToken,
     timestamp: Date.now()
   };
-  const content = JSON.stringify(qrData);
-  const logoPath = path.resolve(process.cwd(), 'public', 'placeholder.svg');
-  const qrBuffer = await createQRWithLogo({
-    content,
-    logo: {
-      src: logoPath,
-      logoSize: 0.2
-    },
-    width: 400,
-    height: 400
-  });
-  return qrBuffer.toString('base64');
+  // Use the existing QRCode library (no logo)
+  return await generateQRCode(qrData);
 };
 
 // Parse CSV data

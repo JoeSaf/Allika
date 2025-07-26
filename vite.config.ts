@@ -9,12 +9,12 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     proxy: {
-      '/api': 'http://localhost:5000'
-    }
+      "/api": "http://localhost:5000",
+    },
   },
   plugins: [
     react(),
-    mode === 'development' &&
+    mode === "development" &&
     componentTagger(),
   ].filter(Boolean),
   resolve: {

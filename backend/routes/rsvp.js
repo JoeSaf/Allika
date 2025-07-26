@@ -4,6 +4,7 @@ import { optionalAuth } from '../middleware/auth.js';
 import { validateRSVPResponse } from '../middleware/validation.js';
 import { formatDateTime } from '../utils/helpers.js';
 import { v4 as uuidv4 } from 'uuid';
+import puppeteer from 'puppeteer';
 
 const router = express.Router();
 
@@ -344,6 +345,82 @@ router.get('/:token/status', async (req, res) => {
       error: true,
       message: 'Error fetching RSVP status'
     });
+  }
+});
+
+router.get('/invitation/:tokenOrAlias/image', async (req, res) => {
+  try {
+    const { tokenOrAlias } = req.params;
+    const pool = getPool();
+
+    // Try to find guest by alias first, then fallback to token
+    let [guests] = await pool.execute(
+      `SELECT g.*, e.title as event_title, e.date as event_date, e.venue as event_venue
+       FROM guests g
+       JOIN events e ON g.event_id = e.id
+       WHERE g.rsvp_alias = ? AND e.status = 'active'`,
+      [tokenOrAlias]
+    );
+    if (guests.length === 0) {
+      [guests] = await pool.execute(
+        `SELECT g.*, e.title as event_title, e.date as event_date, e.venue as event_venue
+         FROM guests g
+         JOIN events e ON g.event_id = e.id
+         WHERE g.rsvp_token = ? AND e.status = 'active'`,
+        [tokenOrAlias]
+      );
+    }
+    if (guests.length === 0) {
+      return res.status(404).json({ error: true, message: 'RSVP link not found or event is not active' });
+    }
+    const guest = guests[0];
+
+    // Minimal HTML template for the invitation card
+    const html = `
+      <html>
+      <head>
+        <meta charset='utf-8'>
+        <style>
+          body { background: #1e293b; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 0; }
+          .card { background: #232f3e; border-radius: 16px; max-width: 400px; margin: 40px auto; padding: 32px; box-shadow: 0 4px 24px #0003; text-align: center; }
+          .title { font-size: 2rem; font-weight: bold; margin-bottom: 8px; }
+          .subtitle { color: #cbd5e1; font-size: 1.1rem; margin-bottom: 8px; }
+          .venue { color: #94a3b8; font-size: 1rem; margin-bottom: 16px; }
+          .dear { font-size: 1.2rem; font-weight: bold; margin-bottom: 8px; }
+          .admit { color: #14b8a6; font-size: 1.1rem; font-weight: bold; margin-bottom: 16px; }
+          .qr { margin: 24px 0; }
+          .footer { color: #94a3b8; font-size: 0.9rem; margin-top: 16px; }
+        </style>
+      </head>
+      <body>
+        <div class='card'>
+          <div class='title'>${guest.event_title}</div>
+          <div class='subtitle'>${new Date(guest.event_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+          <div class='venue'>${guest.event_venue || ''}</div>
+          <div class='dear'>Dear ${guest.name},</div>
+          <div>You are cordially invited to our event!</div>
+          <div class='admit'>Admit: ${guest.guest_count === 1 ? 'Single' : guest.guest_count === 2 ? 'Double' : guest.guest_count === 3 ? 'Triple' : `${guest.guest_count} Guests`}</div>
+          <div class='qr'>
+            <img src='data:image/png;base64,${guest.qr_code_data}' alt='QR Code' style='width: 160px; height: 160px; background: #fff; border-radius: 8px;' />
+          </div>
+          <div class='footer'>RSVP: ${guest.rsvp_contact || ''}</div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const cardElement = await page.$('.card');
+    const imageBuffer = await cardElement.screenshot({ type: 'png' });
+    await browser.close();
+
+    res.set('Content-Type', 'image/png');
+    res.send(imageBuffer);
+  } catch (error) {
+    console.error('Error generating invitation image:', error);
+    res.status(500).json({ error: true, message: 'Error generating invitation image' });
   }
 });
 

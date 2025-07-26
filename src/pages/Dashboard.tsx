@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Header from '@/components/Header';
-import EventCreationModal from '@/components/EventCreationModal';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, MoreHorizontal, Calendar, MapPin, Users, Scan } from 'lucide-react';
-import { format } from 'date-fns';
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import Header from "@/components/Header";
+import EventCreationModal from "@/components/EventCreationModal";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PlusCircle, MoreHorizontal, Calendar, MapPin, Users, Scan, CheckCircle } from "lucide-react";
+import { format } from "date-fns";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,9 +14,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { isUserLoggedIn, requireLogin, getCurrentUser } from '@/utils/auth';
-import { toast } from '@/hooks/use-toast';
-import { apiService } from '@/services/api';
+import { isUserLoggedIn, requireLogin, getCurrentUser } from "@/utils/auth";
+import { toast } from "@/hooks/use-toast";
+import { apiService } from "@/services/api";
+import Footer from "@/components/Footer";
 
 interface Event {
   id: string;
@@ -33,47 +34,69 @@ interface Event {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [events, setEvents] = useState<Event[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [newlyCreatedEvent, setNewlyCreatedEvent] = useState<any>(null);
 
   useEffect(() => {
-    console.log('Dashboard mounted, checking auth...');
-    
+    console.log("Dashboard mounted, checking auth...");
+
     // Check if user is logged in
     const userLoggedIn = isUserLoggedIn();
     const currentUser = getCurrentUser();
-    
-    console.log('User logged in:', userLoggedIn);
-    console.log('Current user:', currentUser);
-    
+
+    console.log("User logged in:", userLoggedIn);
+    console.log("Current user:", currentUser);
+
     if (!userLoggedIn) {
-      console.log('User not logged in, redirecting to login...');
-      navigate(requireLogin('/dashboard'));
+      console.log("User not logged in, redirecting to login...");
+      navigate(requireLogin("/dashboard"));
       return;
     }
 
-    console.log('User is logged in, loading events...');
+    // Check for newly created event from navigation state
+    if (location.state?.newlyCreatedEvent) {
+      setNewlyCreatedEvent(location.state.newlyCreatedEvent);
+      // Clear the state to prevent showing the message again on refresh
+      window.history.replaceState({}, document.title);
+    }
+
+    // Clear any old pending event data that might be stale
+    const pendingEventData = localStorage.getItem("alika_pending_event_data");
+    if (pendingEventData) {
+      try {
+        const parsedData = JSON.parse(pendingEventData);
+        const pendingEventId = parsedData.eventId;
+        console.log("[Dashboard] Found pending event data for event:", pendingEventId);
+      } catch (error) {
+        console.error("[Dashboard] Error parsing pending event data:", error);
+        localStorage.removeItem("alika_pending_event_data");
+      }
+    }
+
+    console.log("User is logged in, loading events...");
     loadEvents();
-  }, [navigate]);
+  }, [navigate, location.state]);
 
   const loadEvents = async () => {
     try {
-      console.log('Loading events from API...');
+      console.log("Loading events from API...");
       const response = await apiService.getEvents();
       if (response.success && response.data?.events) {
-        console.log('Loaded events:', response.data.events);
+        console.log("Loaded events:", response.data.events);
         setEvents(response.data.events);
       } else {
-        console.log('No events found or API error');
+        console.log("No events found or API error");
         setEvents([]);
       }
     } catch (error) {
-      console.error('Error loading events:', error);
+      console.error("Error loading events:", error);
       toast({
         title: "Error Loading Events",
         description: "There was a problem loading your events. Please try refreshing the page.",
-        variant: "destructive"
+        variant: "destructive",
       });
       setEvents([]);
     } finally {
@@ -82,15 +105,15 @@ const Dashboard = () => {
   };
 
   // Add error boundary
-  if (typeof window !== 'undefined') {
-    window.addEventListener('error', (event) => {
-      console.error('Global error caught:', event.error);
+  if (typeof window !== "undefined") {
+    window.addEventListener("error", (event) => {
+      console.error("Global error caught:", event.error);
     });
   }
 
   const handleCreateEvent = () => {
     if (!isUserLoggedIn()) {
-      navigate(requireLogin('/dashboard'));
+      navigate(requireLogin("/dashboard"));
       return;
     }
     setShowCreateModal(true);
@@ -105,27 +128,36 @@ const Dashboard = () => {
         description: "The event has been successfully deleted.",
       });
     } catch (error) {
-      console.error('Error deleting event:', error);
+      console.error("Error deleting event:", error);
       toast({
         title: "Error",
         description: "There was a problem deleting the event.",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
   const handleEditEvent = (id: string) => {
     try {
-      // Store the current event ID in localStorage for the template editor
-      localStorage.setItem('alika_current_event', id);
-      console.log('[Dashboard] Navigating to template editor with event ID:', id);
+      // Check for pending event data and preserve it
+      const pendingEventData = localStorage.getItem("alika_pending_event_data");
+      if (pendingEventData) {
+        const parsedData = JSON.parse(pendingEventData);
+        if (parsedData.eventId === id) {
+          console.log("[Dashboard] Found pending event data for event:", id);
+          // Keep the pending data for template editor to use
+          console.log("[Dashboard] Preserving pending event data for template editor");
+        }
+      }
+
+      console.log("[Dashboard] Navigating to template editor with event ID:", id);
       navigate(`/template/${id}`);
     } catch (error) {
-      console.error('Error setting current event:', error);
+      console.error("Error navigating to template editor:", error);
       toast({
         title: "Error",
         description: "There was a problem opening the event editor.",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -133,23 +165,25 @@ const Dashboard = () => {
   const formatDate = (dateString: string): string => {
     try {
       // Handle different date formats
-      if (!dateString) return 'No date set';
-      
+      if (!dateString) {
+        return "No date set";
+      }
+
       // If it's already a formatted string, return as is
-      if (dateString.includes(',') || dateString.includes('th') || dateString.includes('st') || dateString.includes('nd') || dateString.includes('rd')) {
+      if (dateString.includes(",") || dateString.includes("th") || dateString.includes("st") || dateString.includes("nd") || dateString.includes("rd")) {
         return dateString;
       }
-      
+
       // Try to parse as ISO date
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
         return dateString; // Return original if parsing fails
       }
-      
-      return format(date, 'MMM dd, yyyy');
+
+      return format(date, "MMM dd, yyyy");
     } catch (error) {
       console.error("Error formatting date:", error);
-      return dateString || 'Invalid Date';
+      return dateString || "Invalid Date";
     }
   };
 
@@ -171,21 +205,33 @@ const Dashboard = () => {
       </div>
     );
   }
-  
+
   // Add a simple fallback in case of rendering errors
   try {
     return (
-      <div className="min-h-screen bg-slate-900">
+      <div className="min-h-screen bg-slate-900 flex flex-col">
         <Header />
-        
-        <div className="container mx-auto px-4 py-8 pt-24">
-          
+
+        <div className="container mx-auto px-4 py-8 pt-24 flex-1">
+
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-4xl font-bold text-white mb-2">Your Events</h1>
               <p className="text-slate-300">Manage and track your events</p>
             </div>
-            <Button 
+
+            {newlyCreatedEvent && (
+              <div className="bg-green-600/20 border border-green-500/50 rounded-lg p-4 mb-4">
+                <div className="flex items-center">
+                  <CheckCircle className="w-5 h-5 text-green-400 mr-2" />
+                  <div>
+                    <p className="text-green-400 font-medium">Event Created Successfully!</p>
+                    <p className="text-green-300 text-sm">"{newlyCreatedEvent.title}" has been created. Click "Continue Editing" to customize it.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <Button
               onClick={handleCreateEvent}
               className="bg-gradient-to-r from-teal-500 to-green-600 hover:from-teal-600 hover:to-green-700 text-white"
             >
@@ -202,7 +248,7 @@ const Dashboard = () => {
                 </div>
                 <h3 className="text-xl font-semibold text-slate-400 mb-2">No events yet</h3>
                 <p className="text-slate-500 mb-6">Create your first event to get started with Alika</p>
-                <Button 
+                <Button
                   onClick={handleCreateEvent}
                   className="bg-teal-600 hover:bg-teal-700"
                 >
@@ -239,34 +285,34 @@ const Dashboard = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-slate-800 border-slate-700 text-white">
                           <DropdownMenuLabel className="text-slate-400">Actions</DropdownMenuLabel>
-                          <DropdownMenuItem 
-                            onClick={() => handleEditEvent(event.id)} 
+                          <DropdownMenuItem
+                            onClick={() => handleEditEvent(event.id)}
                             className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer"
                           >
                             Edit Event
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => navigate('/preview-message')} 
+                          <DropdownMenuItem
+                            onClick={() => navigate("/preview-message")}
                             className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer"
                           >
                             Preview Messages
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => navigate(`/analytics/${event.id}`)} 
+                          <DropdownMenuItem
+                            onClick={() => navigate(`/analytics/${event.id}`)}
                             className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer"
                           >
                             View Analytics
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => navigate(`/qr-scanner/${event.id}`)} 
+                          <DropdownMenuItem
+                            onClick={() => navigate(`/qr-scanner/${event.id}`)}
                             className="hover:bg-slate-700 focus:bg-slate-700 cursor-pointer"
                           >
                             <Scan className="w-4 h-4 mr-2" />
                             QR Scanner
                           </DropdownMenuItem>
                           <DropdownMenuSeparator className="bg-slate-700" />
-                          <DropdownMenuItem 
-                            onClick={() => handleDeleteEvent(event.id)} 
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteEvent(event.id)}
                             className="hover:bg-red-700 focus:bg-red-700 text-red-400 hover:text-red-300 cursor-pointer"
                           >
                             Delete Event
@@ -297,17 +343,17 @@ const Dashboard = () => {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-slate-400">Status:</span>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          event.status === 'active' ? 'bg-green-600 text-green-100' :
-                          event.status === 'completed' ? 'bg-blue-600 text-blue-100' :
-                          'bg-yellow-600 text-yellow-100'
+                          event.status === "active" ? "bg-green-600 text-green-100" :
+                            event.status === "completed" ? "bg-blue-600 text-blue-100" :
+                              "bg-yellow-600 text-yellow-100"
                         }`}>
-                          {event.status || 'draft'}
+                          {event.status || "draft"}
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className="mt-4 pt-4 border-t border-slate-700">
-                      <Button 
+                      <Button
                         onClick={() => handleEditEvent(event.id)}
                         className="w-full bg-teal-600 hover:bg-teal-700 text-white"
                       >
@@ -320,23 +366,25 @@ const Dashboard = () => {
             </div>
           )}
         </div>
-        
-        <EventCreationModal 
-          open={showCreateModal} 
+
+        <Footer />
+
+        <EventCreationModal
+          open={showCreateModal}
           onOpenChange={handleModalClose}
         />
       </div>
     );
   } catch (error) {
-    console.error('Dashboard rendering error:', error);
+    console.error("Dashboard rendering error:", error);
     return (
-      <div className="min-h-screen bg-slate-900">
+      <div className="min-h-screen bg-slate-900 flex flex-col">
         <Header />
-        <div className="container mx-auto px-4 py-8 pt-24">
+        <div className="container mx-auto px-4 py-8 pt-24 flex-1">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="text-white text-xl mb-4">Something went wrong</div>
-              <Button 
+              <Button
                 onClick={() => window.location.reload()}
                 className="bg-teal-600 hover:bg-teal-700"
               >

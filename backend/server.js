@@ -16,6 +16,7 @@ import rsvpRoutes from './routes/rsvp.js';
 import checkinRoutes from './routes/checkin.js';
 import messagingRoutes from './routes/messaging.js';
 import analyticsRoutes from './routes/analytics.js';
+import invitationRoutes from './routes/invitation.js';
 
 // Import database connection
 import { connectDB } from './config/database.js';
@@ -104,6 +105,7 @@ app.use('/api/rsvp', rsvpRoutes);
 app.use('/api/checkin', checkinRoutes);
 app.use('/api/messaging', messagingRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/invitation', invitationRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

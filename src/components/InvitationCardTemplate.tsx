@@ -1,6 +1,8 @@
-import React from 'react';
-import { Card } from './ui/card';
-import { QrCode } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import { Card } from "./ui/card";
+import { QrCode } from "lucide-react";
+import QRCode from "qrcode";
+import createQRWithLogo from "qrcode-with-logos";
 
 interface InvitationCardTemplateProps {
   invitationData: any;
@@ -16,58 +18,103 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
   guest,
   event,
   qrCode,
-  template = 'template1',
-  className = '',
+  template = "template1",
+  className = "",
 }) => {
   // Fallbacks for data
-  const coupleName = invitationData?.coupleName || invitationData?.couple_name || event?.title || '';
-  const eventDate = invitationData?.eventDate || invitationData?.event_date || event?.date || '';
-  const eventTime = invitationData?.eventTime || invitationData?.event_time || event?.time || '';
-  const venue = invitationData?.venue || event?.venue || '';
-  const reception = invitationData?.reception || event?.reception || '';
-  const receptionTime = invitationData?.receptionTime || invitationData?.reception_time || event?.receptionTime || '';
-  const theme = invitationData?.theme || event?.theme || '';
-  const rsvpContact = invitationData?.rsvpContact || event?.rsvpContact || '';
-  const rsvpContactSecondary = invitationData?.rsvpContactSecondary || event?.rsvpContactSecondary || '';
-  const additionalInfo = invitationData?.additionalInfo || invitationData?.additional_info || '';
-  const invitingFamily = invitationData?.invitingFamily || invitationData?.inviting_family || '';
-  const guestName = guest?.name || 'Guest Name';
-  const invitationImage = invitationData?.invitationImage || invitationData?.invitation_image || '';
-  const eventDateWords = invitationData?.eventDateWords || invitationData?.event_date_words || '';
-  const dateLang = invitationData?.dateLang || event?.dateLang || 'en';
+  const coupleName = invitationData?.coupleName || invitationData?.couple_name || event?.title || "";
+  const eventDate = invitationData?.eventDate || invitationData?.event_date || event?.date || "";
+  const eventTime = invitationData?.eventTime || invitationData?.event_time || event?.time || "";
+  const venue = invitationData?.venue || event?.venue || "";
+  const reception = invitationData?.reception || event?.reception || "";
+  const receptionTime = invitationData?.receptionTime || invitationData?.reception_time || event?.receptionTime || "";
+  const theme = invitationData?.theme || event?.theme || "";
+  const rsvpContact = invitationData?.rsvpContact || event?.rsvpContact || "";
+  const rsvpContactSecondary = invitationData?.rsvpContactSecondary || event?.rsvpContactSecondary || "";
+  const additionalInfo = invitationData?.additionalInfo || invitationData?.additional_info || "";
+  const invitingFamily = invitationData?.invitingFamily || invitationData?.inviting_family || "";
+  const guestName = guest?.name || "Guest Name";
+  const invitationImage = invitationData?.invitationImage || invitationData?.invitation_image || "";
+  const eventDateWords = invitationData?.eventDateWords || invitationData?.event_date_words || "";
+  const dateLang = invitationData?.dateLang || event?.dateLang || "en";
+
+  const [qrWithLogo, setQrWithLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const generateQrWithLogo = async () => {
+      if (qrCode) {
+        setQrWithLogo(qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`);
+        return;
+      }
+      // Compose QR data (mimic backend structure)
+      if (!guest || !event) {
+        return;
+      }
+      const qrData = {
+        type: "guest_checkin",
+        guestId: guest.id,
+        eventId: event.id,
+        token: guest.rsvp_token,
+        timestamp: Date.now(),
+      };
+      const content = JSON.stringify(qrData);
+      try {
+        const logoUrl = "/placeholder.svg";
+        const qrCanvas = await createQRWithLogo({
+          content,
+          logo: { src: logoUrl, logoSize: 0.2 },
+          width: 400,
+          height: 400,
+        });
+        setQrWithLogo(qrCanvas.toDataURL());
+      } catch (err) {
+        // fallback to plain QR
+        try {
+          const fallback = await QRCode.toDataURL(content, { width: 400, margin: 1 });
+          setQrWithLogo(fallback);
+        } catch {}
+      }
+    };
+    generateQrWithLogo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrCode, guest?.id, event?.id]);
 
   // Format time in words
   const formatTimeInWords = (timeString: string, language: string) => {
-    if (!timeString) return '';
-    
+    if (!timeString) {
+      return "";
+    }
+
     try {
-      const [hours, minutes] = timeString.split(':').map(Number);
-      if (isNaN(hours) || isNaN(minutes)) return timeString;
-      
+      const [hours, minutes] = timeString.split(":").map(Number);
+      if (isNaN(hours) || isNaN(minutes)) {
+        return timeString;
+      }
+
       const date = new Date();
       date.setHours(hours, minutes, 0, 0);
-      
-      if (language === 'sw') {
+
+      if (language === "sw") {
         // Swahili time format
         const hour = date.getHours();
         const minute = date.getMinutes();
-        
+
         // Swahili time words
         const swahiliHours = [
-          'saa sita', 'saa moja', 'saa mbili', 'saa tatu', 'saa nne', 'saa tano',
-          'saa sita', 'saa saba', 'saa nane', 'saa tisa', 'saa kumi', 'saa kumi na moja',
-          'saa sita', 'saa moja', 'saa mbili', 'saa tatu', 'saa nne', 'saa tano',
-          'saa sita', 'saa saba', 'saa nane', 'saa tisa', 'saa kumi', 'saa kumi na moja'
+          "saa sita", "saa moja", "saa mbili", "saa tatu", "saa nne", "saa tano",
+          "saa sita", "saa saba", "saa nane", "saa tisa", "saa kumi", "saa kumi na moja",
+          "saa sita", "saa moja", "saa mbili", "saa tatu", "saa nne", "saa tano",
+          "saa sita", "saa saba", "saa nane", "saa tisa", "saa kumi", "saa kumi na moja",
         ];
-        
+
         const swahiliMinutes = [
-          'saa kamili', 'dakika tano', 'dakika kumi', 'dakika kumi na tano', 'dakika ishirini',
-          'dakika ishirini na tano', 'dakika thelathini', 'dakika thelathini na tano',
-          'dakika arobaini', 'dakika arobaini na tano', 'dakika hamsini', 'dakika hamsini na tano'
+          "saa kamili", "dakika tano", "dakika kumi", "dakika kumi na tano", "dakika ishirini",
+          "dakika ishirini na tano", "dakika thelathini", "dakika thelathini na tano",
+          "dakika arobaini", "dakika arobaini na tano", "dakika hamsini", "dakika hamsini na tano",
         ];
-        
+
         let timeInWords = swahiliHours[hour];
-        
+
         if (minute > 0) {
           if (minute <= 30) {
             timeInWords += ` na ${swahiliMinutes[Math.floor(minute / 5)]}`;
@@ -77,18 +124,18 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
             timeInWords = swahiliHours[nextHour] + ` kasoro ${swahiliMinutes[Math.floor(remainingMinutes / 5)]}`;
           }
         }
-        
+
         return timeInWords;
       } else {
         // English time format
-        return date.toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
+        return date.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
         });
       }
     } catch (error) {
-      console.error('Error formatting time in words:', error);
+      console.error("Error formatting time in words:", error);
       return timeString;
     }
   };
@@ -98,7 +145,7 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
 
   // Template 1: Classic Portrait
   const renderTemplate1 = () => (
-    <Card className={`bg-slate-800 border-slate-700 p-8 max-w-lg w-full shadow-lg ${className}`}>
+    <Card className={`card bg-slate-800 border-slate-700 p-8 max-w-lg w-full shadow-lg ${className}`} data-invitation-card>
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-white mb-2">{coupleName}</h2>
         <p className="text-slate-300 mb-1">{eventDateWords || eventDate} {eventTimeInWords && `at ${eventTimeInWords}`}</p>
@@ -108,16 +155,21 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
       <div className="mb-6 text-center">
         <p className="text-white text-lg font-semibold mb-2">Dear {guestName},</p>
         <p className="text-slate-200 mb-2">You are cordially invited to our event!</p>
+        {guest?.guestCount && (
+          <p className="text-teal-400 mb-2 font-semibold">
+            Admit: {guest.guestCount === 1 ? "Single" : guest.guestCount === 2 ? "Double" : guest.guestCount === 3 ? "Triple" : `${guest.guestCount} Guests`}
+          </p>
+        )}
         {invitationImage && (
           <img src={invitationImage} alt="Invitation" className="mx-auto mb-4 rounded-lg max-h-48" />
         )}
       </div>
-      
+
       {/* QR Code Section */}
       <div className="mb-6 text-center border-t border-slate-600 pt-6">
         <div className="bg-white rounded-lg p-4 inline-block">
-          {qrCode ? (
-            <img src={`data:image/png;base64,${qrCode}`} alt="Check-in QR Code" className="w-32 h-32" />
+          {qrWithLogo ? (
+            <img src={qrWithLogo} alt="Check-in QR Code" className="w-32 h-32" />
           ) : (
             <div className="w-32 h-32 bg-slate-200 rounded flex items-center justify-center">
               <QrCode className="w-16 h-16 text-slate-400" />
@@ -127,7 +179,7 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
         <p className="text-slate-300 mt-3 font-medium">Check-in QR Code</p>
         <p className="text-slate-400 text-sm mt-1">Present this code at the entrance</p>
       </div>
-      
+
       {rsvpContact && (
         <div className="text-center text-xs text-slate-400 mt-2">
           <p>RSVP: {rsvpContact}</p>
@@ -140,7 +192,7 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
 
   // Template 2: Modern Landscape
   const renderTemplate2 = () => (
-    <Card className={`bg-slate-700 border-slate-600 p-8 max-w-2xl w-full shadow-lg flex flex-row items-center ${className}`}>
+    <Card className={`card bg-slate-700 border-slate-600 p-8 max-w-2xl w-full shadow-lg flex flex-row items-center ${className}`} data-invitation-card>
       <div className="flex-1 pr-8">
         <h2 className="text-3xl font-bold text-white mb-2">{coupleName}</h2>
         <p className="text-slate-300 mb-1">{eventDateWords || eventDate} {eventTimeInWords && `at ${eventTimeInWords}`}</p>
@@ -148,6 +200,11 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
         {theme && <p className="text-teal-400 mb-2">Theme: {theme}</p>}
         <p className="text-white text-lg font-semibold mb-2 mt-4">Dear {guestName},</p>
         <p className="text-slate-200 mb-2">You are cordially invited to our event!</p>
+        {guest?.guestCount && (
+          <p className="text-teal-400 mb-2 font-semibold">
+            Admit: {guest.guestCount === 1 ? "Single" : guest.guestCount === 2 ? "Double" : guest.guestCount === 3 ? "Triple" : `${guest.guestCount} Guests`}
+          </p>
+        )}
         {rsvpContact && (
           <div className="text-slate-400 text-sm mt-2">
             <p>RSVP: {rsvpContact}</p>
@@ -159,7 +216,7 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
         {invitationImage && (
           <img src={invitationImage} alt="Invitation" className="mb-4 rounded-lg max-h-48" />
         )}
-        
+
         {/* QR Code Section */}
         <div className="text-center">
           <div className="bg-white rounded-lg p-3 inline-block mb-2">
@@ -180,7 +237,7 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
 
   // Template 3: Artistic Layout
   const renderTemplate3 = () => (
-    <Card className={`bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 border-slate-600 shadow-2xl relative overflow-hidden min-h-[600px] ${className}`}>
+    <Card className={`card bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 border-slate-600 shadow-2xl relative overflow-hidden min-h-[600px] ${className}`} data-invitation-card>
       <div className="absolute inset-0">
         <div className="absolute top-4 right-4 w-32 h-32 bg-teal-500/20 rounded-full blur-xl"></div>
         <div className="absolute bottom-4 left-4 w-24 h-24 bg-purple-500/20 rounded-full blur-xl"></div>
@@ -198,7 +255,7 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
             ) : (
               <div className="w-full h-40 bg-slate-600 rounded-lg flex items-center justify-center" />
             )}
-            
+
             {/* QR Code Section */}
             <div className="mt-4 text-center">
               <div className="bg-white/95 rounded-lg p-3 inline-block">
@@ -241,6 +298,11 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
         </div>
         <div className="mt-8 text-center">
           <p className="text-white text-sm opacity-75">Guest: {guestName}</p>
+          {guest?.guestCount && (
+            <p className="text-teal-400 text-sm font-semibold mt-1">
+              Admit: {guest.guestCount === 1 ? "Single" : guest.guestCount === 2 ? "Double" : guest.guestCount === 3 ? "Triple" : `${guest.guestCount} Guests`}
+            </p>
+          )}
           {additionalInfo && <p className="text-white text-xs opacity-50 mt-2">{additionalInfo}</p>}
         </div>
       </div>
@@ -248,14 +310,14 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
   );
 
   switch (template) {
-    case 'template2':
-      return renderTemplate2();
-    case 'template3':
-      return renderTemplate3();
-    case 'template1':
-    default:
-      return renderTemplate1();
+  case "template2":
+    return renderTemplate2();
+  case "template3":
+    return renderTemplate3();
+  case "template1":
+  default:
+    return renderTemplate1();
   }
 };
 
-export default InvitationCardTemplate; 
+export default InvitationCardTemplate;

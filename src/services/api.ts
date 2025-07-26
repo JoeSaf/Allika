@@ -1,6 +1,6 @@
-// API service for communicating with the backend
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { env } from "@/config/environment";
 
+// Types
 interface ApiResponse<T = any> {
   success?: boolean;
   error?: boolean;
@@ -13,6 +13,75 @@ interface ApiResponse<T = any> {
   }>;
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Event {
+  id: string;
+  title: string;
+  type: string;
+  date: string;
+  time?: string;
+  venue?: string;
+  reception?: string;
+  receptionTime?: string;
+  theme?: string;
+  rsvpContact?: string;
+  additionalInfo?: string;
+  invitingFamily?: string;
+  status: "draft" | "active" | "completed";
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Guest {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  tableNumber?: string;
+  guestCount?: number;
+  specialRequests?: string;
+  status: "invited" | "confirmed" | "declined" | "checked-in";
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface RsvpResponse {
+  id: string;
+  response: "confirmed" | "declined";
+  guestCount?: number;
+  specialRequests?: string;
+  additionalFields?: Record<string, any>;
+  createdAt: string;
+}
+
+interface CheckInLog {
+  id: string;
+  guestId: string;
+  eventId: string;
+  notes?: string;
+  checkedInAt: string;
+  checkedInBy: string;
+}
+
+interface MessageLog {
+  id: string;
+  guestId: string;
+  eventId: string;
+  messageType: "sms" | "whatsapp" | "email";
+  status: "sent" | "delivered" | "failed" | "pending";
+  message: string;
+  sentAt: string;
+}
+
+// API Service Class
 class ApiService {
   private baseURL: string;
 
@@ -22,16 +91,14 @@ class ApiService {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
-    
-    // Get token from localStorage
-    const token = localStorage.getItem('alika_token');
-    
+    const token = localStorage.getItem("alika_token");
+
     const config: RequestInit = {
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
         ...options.headers,
       },
@@ -43,12 +110,16 @@ class ApiService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        const error = new Error(data.message || `HTTP error! status: ${response.status}`);
+        (error as any).status = response.status;
+        throw error;
       }
 
       return data;
     } catch (error) {
-      console.error('API request failed:', error);
+      if (env.isDevelopment) {
+        console.error("API request failed:", error);
+      }
       throw error;
     }
   }
@@ -59,9 +130,9 @@ class ApiService {
     email: string;
     password: string;
     phone?: string;
-  }): Promise<ApiResponse<{ user: any; token: string }>> {
-    return this.request('/auth/register', {
-      method: 'POST',
+  }): Promise<ApiResponse<{ user: User; token: string }>> {
+    return this.request("/auth/register", {
+      method: "POST",
       body: JSON.stringify(userData),
     });
   }
@@ -69,23 +140,23 @@ class ApiService {
   async login(credentials: {
     email: string;
     password: string;
-  }): Promise<ApiResponse<{ user: any; token: string }>> {
-    return this.request('/auth/login', {
-      method: 'POST',
+  }): Promise<ApiResponse<{ user: User; token: string }>> {
+    return this.request("/auth/login", {
+      method: "POST",
       body: JSON.stringify(credentials),
     });
   }
 
-  async getCurrentUser(): Promise<ApiResponse<{ user: any }>> {
-    return this.request('/auth/me');
+  async getCurrentUser(): Promise<ApiResponse<{ user: User }>> {
+    return this.request("/auth/me");
   }
 
   async changePassword(passwords: {
     currentPassword: string;
     newPassword: string;
   }): Promise<ApiResponse> {
-    return this.request('/auth/change-password', {
-      method: 'POST',
+    return this.request("/auth/change-password", {
+      method: "POST",
       body: JSON.stringify(passwords),
     });
   }
@@ -103,9 +174,9 @@ class ApiService {
     rsvpContact?: string;
     additionalInfo?: string;
     invitingFamily?: string;
-  }): Promise<ApiResponse<{ event: any }>> {
-    return this.request('/events', {
-      method: 'POST',
+  }): Promise<ApiResponse<{ event: Event }>> {
+    return this.request("/events", {
+      method: "POST",
       body: JSON.stringify(eventData),
     });
   }
@@ -115,7 +186,7 @@ class ApiService {
     limit?: number;
     search?: string;
     status?: string;
-  }): Promise<ApiResponse<{ events: any[]; pagination: any }>> {
+  }): Promise<ApiResponse<{ events: Event[]; pagination: any }>> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -124,14 +195,14 @@ class ApiService {
         }
       });
     }
-    
+
     const queryString = queryParams.toString();
-    const endpoint = queryString ? `/events?${queryString}` : '/events';
-    
+    const endpoint = queryString ? `/events?${queryString}` : "/events";
+
     return this.request(endpoint);
   }
 
-  async getEvent(eventId: string): Promise<ApiResponse<{ event: any }>> {
+  async getEvent(eventId: string): Promise<ApiResponse<{ event: Event }>> {
     return this.request(`/events/${eventId}`);
   }
 
@@ -149,18 +220,18 @@ class ApiService {
       rsvpContact: string;
       additionalInfo: string;
       invitingFamily: string;
-      status: 'draft' | 'active' | 'completed';
-    }>
-  ): Promise<ApiResponse<{ event: any }>> {
+      status: "draft" | "active" | "completed";
+    }>,
+  ): Promise<ApiResponse<{ event: Event }>> {
     return this.request(`/events/${eventId}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(eventData),
     });
   }
 
   async deleteEvent(eventId: string): Promise<ApiResponse> {
     return this.request(`/events/${eventId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
@@ -183,10 +254,10 @@ class ApiService {
       invitationImage?: string;
       dateLang?: string;
       selectedTemplate?: string;
-    }
+    },
   ): Promise<ApiResponse> {
     return this.request(`/events/${eventId}/invitation-data`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(invitationData),
     });
   }
@@ -209,7 +280,7 @@ class ApiService {
       additionalFields?: Array<{
         id: string;
         label: string;
-        type: 'text' | 'textarea' | 'select';
+        type: "text" | "textarea" | "select";
         required: boolean;
         options?: string[];
       }>;
@@ -221,10 +292,10 @@ class ApiService {
       accentColor?: string;
       rsvpContact?: string;
       rsvpContactSecondary?: string;
-    }
+    },
   ): Promise<ApiResponse> {
     return this.request(`/events/${eventId}/rsvp-settings`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(rsvpSettings),
     });
   }
@@ -239,10 +310,10 @@ class ApiService {
       tableNumber?: string;
       guestCount?: number;
       specialRequests?: string;
-    }
-  ): Promise<ApiResponse<{ guest: any }>> {
+    },
+  ): Promise<ApiResponse<{ guest: Guest }>> {
     return this.request(`/guests/${eventId}`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(guestData),
     });
   }
@@ -256,22 +327,22 @@ class ApiService {
       tableNumber?: string;
       guestCount?: number;
       specialRequests?: string;
-    }>
-  ): Promise<ApiResponse<{ createdGuests: any[]; errors?: any[] }>> {
+    }>,
+  ): Promise<ApiResponse<{ createdGuests: Guest[]; errors?: any[] }>> {
     return this.request(`/guests/${eventId}/bulk`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ guests }),
     });
   }
 
-  async uploadGuestsCSV(eventId: string, file: File): Promise<ApiResponse<{ createdGuests: any[]; errors?: any[] }>> {
+  async uploadGuestsCSV(eventId: string, file: File): Promise<ApiResponse<{ createdGuests: Guest[]; errors?: any[] }>> {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
 
-    const token = localStorage.getItem('alika_token');
-    
+    const token = localStorage.getItem("alika_token");
+
     const response = await fetch(`${this.baseURL}/guests/${eventId}/upload-csv`, {
-      method: 'POST',
+      method: "POST",
       headers: {
         ...(token && { Authorization: `Bearer ${token}` }),
       },
@@ -294,8 +365,8 @@ class ApiService {
       search?: string;
       page?: number;
       limit?: number;
-    }
-  ): Promise<ApiResponse<{ guests: any[]; pagination: any }>> {
+    },
+  ): Promise<ApiResponse<{ guests: Guest[]; pagination: any }>> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -304,10 +375,10 @@ class ApiService {
         }
       });
     }
-    
+
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/guests/${eventId}?${queryString}` : `/guests/${eventId}`;
-    
+
     return this.request(endpoint);
   }
 
@@ -321,23 +392,23 @@ class ApiService {
       tableNumber: string;
       guestCount: number;
       specialRequests: string;
-    }>
-  ): Promise<ApiResponse<{ guest: any }>> {
+    }>,
+  ): Promise<ApiResponse<{ guest: Guest }>> {
     return this.request(`/guests/${eventId}/${guestId}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(guestData),
     });
   }
 
   async deleteGuest(eventId: string, guestId: string): Promise<ApiResponse> {
     return this.request(`/guests/${eventId}/${guestId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
   async exportGuestsCSV(eventId: string): Promise<Blob> {
-    const token = localStorage.getItem('alika_token');
-    
+    const token = localStorage.getItem("alika_token");
+
     const response = await fetch(`${this.baseURL}/guests/${eventId}/export-csv`, {
       headers: {
         ...(token && { Authorization: `Bearer ${token}` }),
@@ -353,7 +424,7 @@ class ApiService {
 
   async checkDuplicatePhones(
     eventId: string,
-    phoneNumbers: string[]
+    phoneNumbers: string[],
   ): Promise<ApiResponse<{
     duplicates: Array<{
       phone: string;
@@ -362,18 +433,18 @@ class ApiService {
     hasDuplicates: boolean;
   }>> {
     return this.request(`/guests/${eventId}/check-duplicates`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ phoneNumbers }),
     });
   }
 
   // RSVP endpoints (public)
   async getRsvpInfo(token: string): Promise<ApiResponse<{
-    guest: any;
-    event: any;
+    guest: Guest;
+    event: Event;
     rsvpSettings: any;
     hasResponded: boolean;
-    lastResponse: any;
+    lastResponse: RsvpResponse;
   }>> {
     return this.request(`/rsvp/${token}`);
   }
@@ -381,14 +452,14 @@ class ApiService {
   async submitRsvp(
     token: string,
     rsvpData: {
-      response: 'confirmed' | 'declined';
+      response: "confirmed" | "declined";
       guestCount?: number;
       specialRequests?: string;
       additionalFields?: Record<string, any>;
-    }
-  ): Promise<ApiResponse<{ guest: any; response: any }>> {
+    },
+  ): Promise<ApiResponse<{ guest: Guest; response: RsvpResponse }>> {
     return this.request(`/rsvp/${token}`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(rsvpData),
     });
   }
@@ -398,24 +469,24 @@ class ApiService {
   }
 
   async getRsvpStatus(token: string): Promise<ApiResponse<{
-    guest: any;
-    event: any;
-    response: any;
+    guest: Guest;
+    event: Event;
+    response: RsvpResponse;
   }>> {
     return this.request(`/rsvp/${token}/status`);
   }
 
   // Check-in endpoints
-  async checkInGuest(token: string, notes?: string): Promise<ApiResponse<{ guest: any; checkInLog: any }>> {
-    return this.request('/checkin', {
-      method: 'POST',
+  async checkInGuest(token: string, notes?: string): Promise<ApiResponse<{ guest: Guest; checkInLog: CheckInLog }>> {
+    return this.request("/checkin", {
+      method: "POST",
       body: JSON.stringify({ token, notes }),
     });
   }
 
-  async checkInGuestQr(qrData: string): Promise<ApiResponse<{ guest: any; checkInLog: any }>> {
-    return this.request('/checkin/qr-scan', {
-      method: 'POST',
+  async checkInGuestQr(qrData: string): Promise<ApiResponse<{ guest: Guest; checkInLog: CheckInLog }>> {
+    return this.request("/checkin/qr-scan", {
+      method: "POST",
       body: JSON.stringify({ qrData }),
     });
   }
@@ -423,18 +494,18 @@ class ApiService {
   async checkInGuestManual(
     eventId: string,
     guestId: string,
-    notes?: string
-  ): Promise<ApiResponse<{ guest: any; checkInLog: any }>> {
+    notes?: string,
+  ): Promise<ApiResponse<{ guest: Guest; checkInLog: CheckInLog }>> {
     return this.request(`/checkin/${eventId}/${guestId}`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ notes }),
     });
   }
 
   async getCheckInLogs(
     eventId: string,
-    params?: { page?: number; limit?: number }
-  ): Promise<ApiResponse<{ logs: any[]; pagination: any }>> {
+    params?: { page?: number; limit?: number },
+  ): Promise<ApiResponse<{ logs: CheckInLog[]; pagination: any }>> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -443,16 +514,16 @@ class ApiService {
         }
       });
     }
-    
+
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/checkin/${eventId}/logs?${queryString}` : `/checkin/${eventId}/logs`;
-    
+
     return this.request(endpoint);
   }
 
   async getCheckInSummary(eventId: string): Promise<ApiResponse<{
     statistics: any;
-    recentCheckins: any[];
+    recentCheckins: CheckInLog[];
     checkInRate: number;
   }>> {
     return this.request(`/checkin/${eventId}/summary`);
@@ -461,10 +532,10 @@ class ApiService {
   async undoCheckIn(
     eventId: string,
     guestId: string,
-    reason?: string
-  ): Promise<ApiResponse<{ guest: any }>> {
+    reason?: string,
+  ): Promise<ApiResponse<{ guest: Guest }>> {
     return this.request(`/checkin/${eventId}/${guestId}/undo`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ reason }),
     });
   }
@@ -473,26 +544,26 @@ class ApiService {
   async sendInvites(
     eventId: string,
     data: {
-      messageType: 'sms' | 'whatsapp' | 'email';
+      messageType: "sms" | "whatsapp" | "email";
       guestIds?: string[];
       customMessage?: string;
-    }
+    },
   ): Promise<ApiResponse<{
-    sentMessages: any[];
-    failedMessages: any[];
+    sentMessages: MessageLog[];
+    failedMessages: MessageLog[];
     totalSent: number;
     totalFailed: number;
   }>> {
     return this.request(`/messaging/${eventId}/send-invites`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
 
   async getMessageLogs(
     eventId: string,
-    params?: { page?: number; limit?: number; status?: string; messageType?: string }
-  ): Promise<ApiResponse<{ messages: any[]; pagination: any }>> {
+    params?: { page?: number; limit?: number; status?: string; messageType?: string },
+  ): Promise<ApiResponse<{ messages: MessageLog[]; pagination: any }>> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -501,16 +572,16 @@ class ApiService {
         }
       });
     }
-    
+
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/messaging/${eventId}/logs?${queryString}` : `/messaging/${eventId}/logs`;
-    
+
     return this.request(endpoint);
   }
 
   async getMessagingSummary(eventId: string): Promise<ApiResponse<{
     statistics: any;
-    recentMessages: any[];
+    recentMessages: MessageLog[];
     deliveryRate: number;
   }>> {
     return this.request(`/messaging/${eventId}/summary`);
@@ -518,7 +589,7 @@ class ApiService {
 
   async retryMessages(eventId: string, messageIds: string[]): Promise<ApiResponse<{ retriedCount: number }>> {
     return this.request(`/messaging/${eventId}/retry`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ messageIds }),
     });
   }
@@ -535,8 +606,8 @@ class ApiService {
 
   async getGuestAnalytics(
     eventId: string,
-    params?: { status?: string; page?: number; limit?: number }
-  ): Promise<ApiResponse<{ guests: any[]; pagination: any }>> {
+    params?: { status?: string; page?: number; limit?: number },
+  ): Promise<ApiResponse<{ guests: Guest[]; pagination: any }>> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -545,17 +616,17 @@ class ApiService {
         }
       });
     }
-    
+
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/analytics/${eventId}/guests?${queryString}` : `/analytics/${eventId}/guests`;
-    
+
     return this.request(endpoint);
   }
 
   async getMessageAnalytics(
     eventId: string,
-    params?: { status?: string; messageType?: string; page?: number; limit?: number }
-  ): Promise<ApiResponse<{ messages: any[]; pagination: any }>> {
+    params?: { status?: string; messageType?: string; page?: number; limit?: number },
+  ): Promise<ApiResponse<{ messages: MessageLog[]; pagination: any }>> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -564,55 +635,58 @@ class ApiService {
         }
       });
     }
-    
+
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/analytics/${eventId}/messages?${queryString}` : `/analytics/${eventId}/messages`;
-    
+
     return this.request(endpoint);
   }
 
   async exportAnalytics(eventId: string, format?: string): Promise<ApiResponse<any>> {
     const queryParams = new URLSearchParams();
     if (format) {
-      queryParams.append('format', format);
+      queryParams.append("format", format);
     }
-    
+
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/analytics/${eventId}/export?${queryString}` : `/analytics/${eventId}/export`;
-    
+
     return this.request(endpoint);
   }
 
   async getDashboardOverview(): Promise<ApiResponse<{
     summary: any;
-    recentEvents: any[];
-    upcomingEvents: any[];
+    recentEvents: Event[];
+    upcomingEvents: Event[];
   }>> {
-    return this.request('/analytics/dashboard/overview');
+    return this.request("/analytics/dashboard/overview");
   }
 }
 
 // Create and export the API service instance
-export const apiService = new ApiService(API_BASE_URL);
+export const apiService = new ApiService(`${env.apiUrl}/api`);
 
 // Export types for use in components
-export type { ApiResponse }; 
+export type {
+  ApiResponse,
+  User,
+  Event,
+  Guest,
+  RsvpResponse,
+  CheckInLog,
+  MessageLog,
+};
 
-// Send invitations (single, bulk, or by guestIds)
-export async function sendInvites(eventId: string, data: {
-  messageType: 'sms' | 'whatsapp' | 'email';
-  guestIds?: string[];
-  customMessage?: string;
-}) {
-  return apiService.sendInvites(eventId, data);
-} 
-
-export const addGuest = apiService.addGuest.bind(apiService);
-export const addGuestsBulk = apiService.addGuestsBulk.bind(apiService);
-export const getGuests = apiService.getGuests.bind(apiService);
-export const getEvent = apiService.getEvent.bind(apiService);
-export const getEventAnalytics = apiService.getEventAnalytics.bind(apiService);
-export const checkDuplicatePhones = apiService.checkDuplicatePhones.bind(apiService);
-export const checkInGuestQr = apiService.checkInGuestQr.bind(apiService);
-export const updateRsvpSettings = apiService.updateRsvpSettings.bind(apiService);
-export const createEvent = apiService.createEvent.bind(apiService); 
+// Convenience exports for commonly used methods
+export const {
+  addGuest,
+  addGuestsBulk,
+  getGuests,
+  getEvent,
+  getEventAnalytics,
+  checkDuplicatePhones,
+  checkInGuestQr,
+  updateRsvpSettings,
+  createEvent,
+  sendInvites,
+} = apiService;

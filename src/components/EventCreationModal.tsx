@@ -1,23 +1,14 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { createEvent, updateRsvpSettings } from '@/services/api';
-import { toast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
-import { enUS } from 'date-fns/locale';
-import { Locale } from 'date-fns';
-
-let swLocale: Locale | undefined = undefined;
-try {
-  // Try to import Swahili locale if available
-  // @ts-ignore
-  swLocale = require('date-fns/locale/sw');
-} catch {}
-
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { createEvent, updateRsvpSettings } from "@/services/api";
+import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { enUS } from "date-fns/locale";
 
 interface EventCreationModalProps {
   open: boolean;
@@ -47,57 +38,57 @@ interface EventFormData {
 const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<EventFormData>({
-    name: '',
-    type: 'wedding',
-    description: '',
-    venue: '',
-    date: '',
-    invitingFamily: '',
-    reception: '',
-    receptionTime: '',
-    theme: '',
-    rsvpContact: '',
-    rsvpContactSecondary: ''
+    name: "",
+    type: "wedding",
+    description: "",
+    venue: "",
+    date: "",
+    invitingFamily: "",
+    reception: "",
+    receptionTime: "",
+    theme: "",
+    rsvpContact: "",
+    rsvpContactSecondary: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [dateLang, setDateLang] = useState<'en' | 'sw'>('en');
+  const [dateLang, setDateLang] = useState<"en" | "sw">("en");
   // Accept phone numbers with or without +, and validate length (10-15 digits)
   const phoneRegex = /^\+?\d{10,15}$/;
-  const [rsvpContactError, setRsvpContactError] = useState('');
-  const [rsvpContactSecondaryError, setRsvpContactSecondaryError] = useState('');
+  const [rsvpContactError, setRsvpContactError] = useState("");
+  const [rsvpContactSecondaryError, setRsvpContactSecondaryError] = useState("");
 
   const eventTypes = [
-    { value: 'wedding', label: 'Wedding' },
-    { value: 'birthday', label: 'Birthday Party' },
-    { value: 'anniversary', label: 'Anniversary' },
-    { value: 'graduation', label: 'Graduation' },
-    { value: 'corporate', label: 'Corporate Event' },
-    { value: 'conference', label: 'Conference' },
-    { value: 'awards', label: 'Awards Ceremony' },
-    { value: 'festival', label: 'Festival' },
-    { value: 'meeting', label: 'Meeting' },
-    { value: 'seminar', label: 'Seminar' },
-    { value: 'other', label: 'Other' }
+    { value: "wedding", label: "Wedding" },
+    { value: "birthday", label: "Birthday Party" },
+    { value: "anniversary", label: "Anniversary" },
+    { value: "graduation", label: "Graduation" },
+    { value: "corporate", label: "Corporate Event" },
+    { value: "conference", label: "Conference" },
+    { value: "awards", label: "Awards Ceremony" },
+    { value: "festival", label: "Festival" },
+    { value: "meeting", label: "Meeting" },
+    { value: "seminar", label: "Seminar" },
+    { value: "other", label: "Other" },
   ];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
-    if (name === 'rsvpContact') {
+    if (name === "rsvpContact") {
       setRsvpContactError(
         value && !phoneRegex.test(value)
-          ? 'Please enter a valid phone number (10-15 digits, with or without +).'
-          : ''
+          ? "Please enter a valid phone number."
+          : "",
       );
     }
-    if (name === 'rsvpContactSecondary') {
+    if (name === "rsvpContactSecondary") {
       setRsvpContactSecondaryError(
         value && !phoneRegex.test(value)
-          ? 'Please enter a valid phone number (10-15 digits, with or without +).'
-          : ''
+          ? "Please enter a valid phone number."
+          : "",
       );
     }
   };
@@ -105,34 +96,34 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
   const handleTypeChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
-      type: value
+      type: value,
     }));
   };
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      type: 'wedding',
-      description: '',
-      venue: '',
-      date: '',
-      invitingFamily: '',
-      reception: '',
-      receptionTime: '',
-      theme: '',
-      rsvpContact: '',
-      rsvpContactSecondary: ''
+      name: "",
+      type: "wedding",
+      description: "",
+      venue: "",
+      date: "",
+      invitingFamily: "",
+      reception: "",
+      receptionTime: "",
+      theme: "",
+      rsvpContact: "",
+      rsvpContactSecondary: "",
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name.trim()) {
       toast({
         title: "Event Name Required",
         description: "Please enter a name for your event.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -144,7 +135,7 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
       const eventPayload = cleanPayload({
         title: formData.name.trim(),
         type: formData.type,
-        date: formData.date ? new Date(formData.date).toISOString().slice(0, 10) : '',
+        date: formData.date ? new Date(formData.date).toISOString().slice(0, 10) : "",
         venue: formData.venue || null,
         reception: formData.reception || null,
         theme: formData.theme || null,
@@ -152,51 +143,63 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
         additionalInfo: formData.description || null,
         invitingFamily: formData.invitingFamily || null,
         ...(formData.receptionTime ? { receptionTime: formData.receptionTime.slice(0, 5) } : {}),
-        dateLang: dateLang
+        dateLang: dateLang,
       });
       const res = await createEvent(eventPayload);
-      if (!res || !res.data || !res.data.event) throw new Error('Event creation failed');
+      if (!res || !res.data || !res.data.event) {
+        throw new Error("Event creation failed");
+      }
       const newEvent = res.data.event;
-      
-      console.log('Event created successfully:', { eventId: newEvent.id, title: newEvent.title });
-      
-      // Note: RSVP settings are already created by the backend with appropriate defaults
-      // Users can customize them later in the template editor if needed
-      // Store the current event ID in localStorage for the template editor
-      localStorage.setItem('alika_current_event', newEvent.id);
+
+      console.log("Event created successfully:", { eventId: newEvent.id, title: newEvent.title });
+
+      // Store event data in localStorage for template editor to use
+      localStorage.setItem("alika_pending_event_data", JSON.stringify({
+        eventId: newEvent.id,
+        eventDetails: {
+          name: formData.name,
+          type: formData.type,
+          description: formData.description,
+          venue: formData.venue,
+          date: formData.date,
+          invitingFamily: formData.invitingFamily,
+          reception: formData.reception,
+          receptionTime: formData.receptionTime,
+          theme: formData.theme,
+          rsvpContact: formData.rsvpContact,
+          dateLang: dateLang,
+        },
+      }));
+
       toast({
         title: "Event Created!",
-        description: `Your ${formData.type} event \"${formData.name}\" has been created successfully.`,
+        description: `Your ${formData.type} event "${formData.name}" has been created successfully.`,
       });
-      console.log('[EventCreationModal] Navigating to template editor with event ID:', newEvent.id);
-      navigate(`/template/${newEvent.id}`, {
+
+      // Navigate to dashboard
+      navigate("/dashboard", {
         state: {
-          eventDetails: {
-            name: formData.name,
-            type: formData.type,
-            description: formData.description,
-            venue: formData.venue,
-            date: formData.date,
-            invitingFamily: formData.invitingFamily,
-            reception: formData.reception,
-            receptionTime: formData.receptionTime,
-            theme: formData.theme,
-            rsvpContact: formData.rsvpContact,
-            dateLang: dateLang
-          }
-        }
+          newlyCreatedEvent: {
+            id: newEvent.id,
+            title: newEvent.title,
+            type: newEvent.type,
+          },
+        },
       });
-      // Only close the modal after navigation
+
+      // Log the final state after navigation
       setTimeout(() => {
+        console.log("[EventCreationModal] After navigation - window.location:", window.location.href);
+        console.log("[EventCreationModal] After navigation - localStorage:", localStorage.getItem("alika_current_event"));
         resetForm();
         onOpenChange(false);
       }, 200);
     } catch (error) {
-      console.error('Error creating event:', error);
+      console.error("Error creating event:", error);
       toast({
         title: "Error Creating Event",
         description: "There was a problem creating your event. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -208,9 +211,9 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
       resetForm();
       onOpenChange(false);
       toast({
-        title: 'Event Creation Cancelled',
-        description: 'You have exited event creation.',
-        variant: 'default'
+        title: "Event Creation Cancelled",
+        description: "You have exited event creation.",
+        variant: "default",
       });
     }
   };
@@ -224,7 +227,7 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
             Fill in the details below to create a new event.
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="name" className="text-slate-300">Event Name *</Label>
@@ -236,9 +239,9 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
               value={formData.name}
               onChange={handleInputChange}
               className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
-                required
-                disabled={isSubmitting}
-              />
+              required
+              disabled={isSubmitting}
+            />
           </div>
 
           <div className="space-y-2">
@@ -263,7 +266,7 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
               id="venue"
               name="venue"
               type="text"
-              placeholder="e.g., St. Peter's Church"
+              placeholder="e.g., St. Church"
               value={formData.venue}
               onChange={handleInputChange}
               className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
@@ -286,7 +289,7 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
               {/* Language selector for date */}
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-xs text-slate-400">Display date in:</span>
-                <Select value={dateLang} onValueChange={(val) => setDateLang(val as 'en' | 'sw')}>
+                <Select value={dateLang} onValueChange={(val) => setDateLang(val as "en" | "sw")}>
                   <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-7 w-20 text-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -299,9 +302,10 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
               {/* Friendly date preview */}
               {formData.date && (
                 <div className="text-xs text-slate-400 mt-1">
-                  {new Date(formData.date).toLocaleDateString(
-                    dateLang === 'sw' ? 'sw-TZ' : 'en-US',
-                    { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
+                  {format(
+                    new Date(formData.date),
+                    "EEEE, d MMMM yyyy",
+                    { locale: enUS },
                   )}
                 </div>
               )}
@@ -354,21 +358,21 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={handleClose}
               className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
               disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Creating...' : 'Create Event'}
+              {isSubmitting ? "Creating..." : "Create Event"}
             </Button>
           </div>
         </form>

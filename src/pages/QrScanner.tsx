@@ -1,16 +1,16 @@
 
-import { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import Header from '@/components/Header';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { QrCode, Camera, Users, CheckCircle, X, Search, AlertCircle, CameraOff, Scan, ArrowLeft } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
-import { checkInGuestQr, getEvent, getGuests } from '@/services/api';
-import { isUserLoggedIn, getCurrentUser } from '@/utils/auth';
-import jsQR from 'jsqr';
+import { useState, useRef, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import Header from "@/components/Header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { QrCode, Camera, Users, CheckCircle, X, Search, AlertCircle, CameraOff, Scan, ArrowLeft } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { checkInGuestQr, getEvent, getGuests } from "@/services/api";
+import { isUserLoggedIn, getCurrentUser } from "@/utils/auth";
+import jsQR from "jsqr";
 
 interface Guest {
   id: string;
@@ -38,17 +38,17 @@ const QrScanner = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const [isScanning, setIsScanning] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [checkedInGuests, setCheckedInGuests] = useState<Guest[]>([]);
   const [pendingGuests, setPendingGuests] = useState<Guest[]>([]);
-  const [cameraError, setCameraError] = useState('');
+  const [cameraError, setCameraError] = useState("");
   const [hasPermission, setHasPermission] = useState(false);
   const [currentEvent, setCurrentEvent] = useState<Event | null>(null);
-  const [scanResult, setScanResult] = useState<string>('');
+  const [scanResult, setScanResult] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
-  
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -57,18 +57,18 @@ const QrScanner = () => {
 
   useEffect(() => {
     if (!eventId) {
-      navigate('/dashboard');
+      navigate("/dashboard");
       return;
     }
-    
+
     // Check if user is logged in
     if (!isUserLoggedIn()) {
-      navigate('/login');
+      navigate("/login");
       return;
     }
-    
+
     loadEventData();
-    
+
     return () => {
       // Cleanup camera stream on unmount
       if (streamRef.current) {
@@ -83,41 +83,41 @@ const QrScanner = () => {
   const loadEventData = async () => {
     try {
       setLoading(true);
-      
+
       // Get event data
       const eventRes = await getEvent(eventId!);
       if (!eventRes.success) {
         setAccessDenied(true);
         return;
       }
-      
+
       const event = eventRes.data.event;
       setCurrentEvent(event);
-      
+
       // Get current user info to check ownership
       const currentUser = getCurrentUser();
       if (!currentUser || event.user_id !== currentUser.id) {
         setAccessDenied(true);
         return;
       }
-      
+
       // Get guests data
       const guestsRes = await getGuests(eventId!);
       if (guestsRes.success) {
         const guests = guestsRes.data.guests;
         const checkedIn = guests.filter((guest: Guest) => guest.checked_in);
         const pending = guests.filter((guest: Guest) => !guest.checked_in);
-        
+
         setCheckedInGuests(checkedIn);
         setPendingGuests(pending);
       }
-      
+
     } catch (error) {
-      console.error('Error loading event data:', error);
+      console.error("Error loading event data:", error);
       toast({
         title: "Error",
         description: "Failed to load event data.",
-        variant: "destructive"
+        variant: "destructive",
       });
       setAccessDenied(true);
     } finally {
@@ -127,40 +127,44 @@ const QrScanner = () => {
 
   const requestCameraPermission = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment', // Use back camera if available
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "environment", // Use back camera if available
           width: { ideal: 1280 },
-          height: { ideal: 720 }
-        } 
+          height: { ideal: 720 },
+        },
       });
-      
+
       setHasPermission(true);
-      setCameraError('');
+      setCameraError("");
       streamRef.current = stream;
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-      
+
       return true;
     } catch (error) {
-      console.error('Camera access denied:', error);
-      setCameraError('Camera access denied. Please allow camera access to scan QR codes.');
+      console.error("Camera access denied:", error);
+      setCameraError("Camera access denied. Please allow camera access to scan QR codes.");
       setHasPermission(false);
       return false;
     }
   };
 
   const scanQRCode = () => {
-    if (!videoRef.current || !canvasRef.current || !isScanning) return;
+    if (!videoRef.current || !canvasRef.current || !isScanning) {
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext("2d");
 
-    if (!context) return;
+    if (!context) {
+      return;
+    }
 
     // Set canvas size to match video
     canvas.width = video.videoWidth;
@@ -189,7 +193,7 @@ const QrScanner = () => {
   const handleQRCodeScanned = async (qrData: string) => {
     setIsProcessing(true);
     setIsScanning(false);
-    
+
     try {
       // Parse QR code data
       let parsedData;
@@ -199,17 +203,17 @@ const QrScanner = () => {
         toast({
           title: "Invalid QR Code",
           description: "The scanned QR code is not valid for this event.",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
 
       // Check if it's a valid guest QR code
-      if (!parsedData.type || parsedData.type !== 'guest_checkin') {
+      if (!parsedData.type || parsedData.type !== "guest_checkin") {
         toast({
           title: "Invalid QR Code",
           description: "This QR code is not a valid guest check-in code.",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
@@ -219,39 +223,39 @@ const QrScanner = () => {
         toast({
           title: "Wrong Event",
           description: "This QR code is for a different event.",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
 
       // Send check-in request to backend
       const response = await checkInGuestQr(qrData);
-      
+
       if (response.success) {
         toast({
           title: "Guest Checked In!",
           description: `${response.data.guest.name} has been successfully checked in.`,
         });
-        
+
         // Refresh guest data
         await loadEventData();
       } else {
         toast({
           title: "Check-in Failed",
           description: response.message || "Failed to check in guest.",
-          variant: "destructive"
+          variant: "destructive",
         });
       }
     } catch (error) {
-      console.error('Error processing QR code:', error);
+      console.error("Error processing QR code:", error);
       toast({
         title: "Error",
         description: "Failed to process QR code. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsProcessing(false);
-      setScanResult('');
+      setScanResult("");
     }
   };
 
@@ -260,25 +264,27 @@ const QrScanner = () => {
       toast({
         title: "No Event Selected",
         description: "Please select an event first.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     if (!hasPermission) {
       const granted = await requestCameraPermission();
-      if (!granted) return;
+      if (!granted) {
+        return;
+      }
     }
-    
+
     setIsScanning(true);
-    setScanResult('');
-    
+    setScanResult("");
+
     // Start scanning loop
     if (videoRef.current && videoRef.current.readyState >= 2) {
       scanQRCode();
     } else {
       // Wait for video to be ready
-      videoRef.current?.addEventListener('loadeddata', () => {
+      videoRef.current?.addEventListener("loadeddata", () => {
         scanQRCode();
       });
     }
@@ -297,12 +303,14 @@ const QrScanner = () => {
       videoRef.current.srcObject = null;
     }
     setHasPermission(false);
-    setScanResult('');
+    setScanResult("");
   };
 
   const handleManualCheckIn = async (guestId: string) => {
-    if (!currentEvent) return;
-    
+    if (!currentEvent) {
+      return;
+    }
+
     setIsProcessing(true);
     try {
       // In a real app, you'd call the API to check in the guest
@@ -310,24 +318,24 @@ const QrScanner = () => {
       if (guest) {
         // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         // Update local state
         const updatedPending = pendingGuests.filter(g => g.id !== guestId);
         const updatedCheckedIn = [...checkedInGuests, { ...guest, checked_in: true, check_in_time: new Date().toLocaleTimeString() }];
-        
+
         setPendingGuests(updatedPending);
         setCheckedInGuests(updatedCheckedIn);
-        
-      toast({
+
+        toast({
           title: "Guest Checked In",
           description: `${guest.name} has been checked in successfully!`,
-      });
+        });
       }
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to check in guest.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsProcessing(false);
@@ -336,7 +344,7 @@ const QrScanner = () => {
 
   const filteredPendingGuests = pendingGuests.filter(guest =>
     guest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (guest.email && guest.email.toLowerCase().includes(searchQuery.toLowerCase()))
+    (guest.email && guest.email.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
   if (loading) {
@@ -357,7 +365,7 @@ const QrScanner = () => {
               <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-red-400 mb-2">Access Denied</h3>
               <p className="text-slate-400 mb-4">You don't have permission to access this event's QR scanner.</p>
-              <Button onClick={() => navigate('/dashboard')} className="bg-slate-700 hover:bg-slate-600">
+              <Button onClick={() => navigate("/dashboard")} className="bg-slate-700 hover:bg-slate-600">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Dashboard
               </Button>
@@ -388,22 +396,22 @@ const QrScanner = () => {
   return (
     <div className="min-h-screen bg-slate-900">
       <Header />
-      
+
       <div className="container mx-auto px-4 py-8 pt-24">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <Button 
-                onClick={() => navigate(`/analytics/${eventId}`)} 
-                variant="outline" 
+              <Button
+                onClick={() => navigate(`/analytics/${eventId}`)}
+                variant="outline"
                 className="mb-4"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Analytics
               </Button>
-          <h1 className="text-4xl font-bold text-white mb-2">QR Scanner & Check-in</h1>
-          <p className="text-slate-300">Event: {currentEvent.title}</p>
+              <h1 className="text-4xl font-bold text-white mb-2">QR Scanner & Check-in</h1>
+              <p className="text-slate-300">Event: {currentEvent.title}</p>
               <p className="text-slate-400">{currentEvent.date} • {currentEvent.venue}</p>
             </div>
           </div>
@@ -451,12 +459,12 @@ const QrScanner = () => {
         {/* QR Scanner Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <Card className="bg-slate-800 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
                 <Scan className="h-5 w-5" />
               QR Code Scanner
-            </CardTitle>
-          </CardHeader>
+              </CardTitle>
+            </CardHeader>
             <CardContent>
               <div className="relative">
                 {!isScanning && !hasPermission && (
@@ -472,7 +480,7 @@ const QrScanner = () => {
                   </div>
                 )}
 
-            {cameraError && (
+                {cameraError && (
                   <div className="aspect-video bg-slate-700 rounded-lg flex items-center justify-center">
                     <div className="text-center">
                       <CameraOff className="w-16 h-16 text-red-500 mx-auto mb-4" />
@@ -480,10 +488,10 @@ const QrScanner = () => {
                       <Button onClick={startScanning} variant="outline">
                         Try Again
                       </Button>
-                </div>
-              </div>
-            )}
-            
+                    </div>
+                  </div>
+                )}
+
                 {isScanning && (
                   <div className="relative">
                     <video
@@ -505,15 +513,15 @@ const QrScanner = () => {
                         <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-teal-400"></div>
                       </div>
                     </div>
-                <Button 
-                  onClick={stopScanning}
+                    <Button
+                      onClick={stopScanning}
                       className="absolute top-4 right-4"
                       variant="destructive"
                     >
                       <X className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
+                    </Button>
+                  </div>
+                )}
 
                 {isProcessing && (
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
@@ -521,8 +529,8 @@ const QrScanner = () => {
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400 mx-auto mb-2"></div>
                       <p className="text-white">Processing...</p>
                     </div>
-                </div>
-              )}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -543,25 +551,25 @@ const QrScanner = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {filteredPendingGuests.map((guest) => (
-                    <div key={guest.id} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
-                      <div>
+                {filteredPendingGuests.map((guest) => (
+                  <div key={guest.id} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
+                    <div>
                       <p className="text-white font-medium">{guest.name}</p>
                       {guest.email && <p className="text-slate-400 text-sm">{guest.email}</p>}
-                      </div>
-                        <Button 
+                    </div>
+                    <Button
                       onClick={() => handleManualCheckIn(guest.id)}
                       disabled={isProcessing}
-                          size="sm" 
-                        >
+                      size="sm"
+                    >
                       Check In
-                        </Button>
-                    </div>
-                  ))}
+                    </Button>
+                  </div>
+                ))}
                 {filteredPendingGuests.length === 0 && (
                   <p className="text-slate-400 text-center py-4">No pending guests found</p>
                 )}
-                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

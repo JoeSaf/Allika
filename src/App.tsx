@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+
+// Pages
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Templates from "./pages/Templates";
@@ -14,16 +15,22 @@ import ViewAnalytics from "./pages/ViewAnalytics";
 import QrScanner from "./pages/QrScanner";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
-import { logoutUser, isUserLoggedIn } from "@/utils/auth";
-import { toast } from "@/hooks/use-toast";
+import InvitationCard from "./pages/InvitationCard";
+import Rsvp from "./pages/Rsvp";
+
+// Components
 import IdleSessionHandler from "@/components/IdleSessionHandler";
-import InvitationCard from './pages/InvitationCard';
-import Rsvp from './pages/Rsvp';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
+    },
+  },
+});
 
-const App = () => {
-  // Removed useNavigate and idle session logic
+const App = (): JSX.Element => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -43,7 +50,6 @@ const App = () => {
             <Route path="/qr-scanner/:eventId" element={<QrScanner />} />
             <Route path="/invitation/:token" element={<InvitationCard />} />
             <Route path="/rsvp/:token" element={<Rsvp />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

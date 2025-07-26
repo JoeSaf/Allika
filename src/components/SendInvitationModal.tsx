@@ -2,21 +2,23 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import * as XLSX from "xlsx";
 import { sendInvites, addGuest, addGuestsBulk, getGuests, checkDuplicatePhones } from "@/services/api";
+import ExcelJS from "exceljs";
 
-const phoneRegex = /^\+\d{1,3}\d{9}$/;
+// Updated regex to be more flexible but still require proper format
+const phoneRegex = /^\+?\d{10,15}$/;
 
 export default function SendInvitationModal({ open, onClose, eventId, template }) {
   const [tab, setTab] = useState("single");
   const [messageType, setMessageType] = useState<"sms" | "whatsapp" | "email">("whatsapp");
   const [sending, setSending] = useState(false);
-  
+
   // Single guest
   const [singleName, setSingleName] = useState("");
   const [singlePhone, setSinglePhone] = useState("");
-  const [singlePhoneError, setSinglePhoneError] = useState('');
-  
+  const [singlePhoneError, setSinglePhoneError] = useState("");
+  const [singleGuestCount, setSingleGuestCount] = useState(1);
+
   // Bulk upload
   const [bulkGuests, setBulkGuests] = useState<Array<{name: string; phone: string; email?: string}>>([]);
   const [fileError, setFileError] = useState("");
@@ -24,7 +26,9 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
 
   const handleFile = (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     setFileError("");
     setBulkGuests([]);
@@ -34,57 +38,65 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
     reader.onload = async (event) => {
       try {
         const result = event.target?.result;
-        if (!result || typeof result === 'string') {
+        if (!result || typeof result === "string") {
           setFileError("Error reading file. Please ensure it's a valid Excel file.");
           return;
         }
-        
+
         const data = new Uint8Array(result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-        
+        // Use exceljs to parse .xlsx files
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(data);
+        const worksheet = workbook.worksheets[0];
+        const rows: any[] = [];
+        worksheet.eachRow((row) => {
+          rows.push(row.values.slice(1)); // remove first undefined
+        });
+        // Now rows[0] is header, rows[1..] are data
         const guests = [];
         const errors = [];
-        
-        // Skip header row, process from row 1
-        for (let i = 1; i < rows.length; i++) {
+
+        for (let i = 1; i < rows.length; i++) { // skip header
           const row = rows[i] as any[];
-          const [name, phone] = row;
+          const [name, phone, guestCountRaw] = row;
+          let guestCount = 1;
+          if (guestCountRaw !== undefined && !isNaN(Number(guestCountRaw)) && Number(guestCountRaw) > 0) {
+            guestCount = Number(guestCountRaw);
+          }
           if (name && phone) {
-            const cleanPhone = phone.toString().replace(/[^0-9]/g, '');
+            const cleanPhone = phone.toString().replace(/[^0-9]/g, "");
             if (cleanPhone.length < 10) {
               errors.push(`Row ${i + 1}: Invalid phone number "${phone}" - too short`);
               continue;
             }
             let formattedPhone = cleanPhone;
-            if (!cleanPhone.startsWith('255') && cleanPhone.length === 9) {
-              formattedPhone = '255' + cleanPhone;
-            } else if (cleanPhone.startsWith('0') && cleanPhone.length === 10) {
-              formattedPhone = '255' + cleanPhone.substring(1);
+            if (!cleanPhone.startsWith("255") && cleanPhone.length === 9) {
+              formattedPhone = "255" + cleanPhone;
+            } else if (cleanPhone.startsWith("0") && cleanPhone.length === 10) {
+              formattedPhone = "255" + cleanPhone.substring(1);
             }
-            guests.push({ name: name.toString().trim(), phone: formattedPhone.startsWith('+') ? formattedPhone : '+' + formattedPhone });
+            guests.push({ name: name.toString().trim(), phone: ensurePhonePrefix(formattedPhone), guestCount });
           } else if (name || phone) {
-            errors.push(`Row ${i + 1}: Missing ${!name ? 'name' : 'phone number'}`);
+            errors.push(`Row ${i + 1}: Missing ${!name ? "name" : "phone number"}`);
           }
         }
-        
+
         if (errors.length > 0) {
-          setFileError(`File contains errors:\n${errors.join('\n')}`);
+          setFileError(`File contains errors:\n${errors.join("\n")}`);
           return;
         }
-        
+
         const phoneErrors: string[] = [];
         const validGuests = guests.filter((g, idx) => {
           if (!phoneRegex.test(g.phone)) {
-            phoneErrors.push(`Row ${idx + 2}: Invalid phone number "${g.phone}". Use +countrycode and 9 digits.`);
+            phoneErrors.push(`Row ${idx + 2}: Invalid phone number "${g.phone}". Please use a valid phone number (10-15 digits).`);
             return false;
           }
           return true;
         });
         setBulkPhoneErrors(phoneErrors);
         setBulkGuests(validGuests);
-        
+
         // Check for duplicates if we have guests and eventId
         if (validGuests.length > 0 && eventId) {
           const phoneNumbers = validGuests.map(g => g.phone).filter(Boolean);
@@ -92,15 +104,15 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
             try {
               const duplicateCheck = await checkDuplicatePhones(eventId, phoneNumbers);
               if (duplicateCheck.success && duplicateCheck.data.hasDuplicates) {
-                const duplicateList = duplicateCheck.data.duplicates.map(d => 
-                  `${d.phone} (${d.existingGuest})`
-                ).join('\n');
+                const duplicateList = duplicateCheck.data.duplicates.map(d =>
+                  `${d.phone} (${d.existingGuest})`,
+                ).join("\n");
                 setFileError(`Duplicate phone numbers found:\n${duplicateList}\n\nPlease remove duplicates before uploading.`);
                 setBulkGuests([]);
                 return;
               }
             } catch (error) {
-              console.error('Error checking duplicates:', error);
+              console.error("Error checking duplicates:", error);
             }
           }
         }
@@ -112,38 +124,44 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
   };
 
   const handleSendSingle = async () => {
-    if (!eventId || !singleName || !singlePhone) return;
-    
+    if (!eventId || !singleName || !singlePhone) {
+      return;
+    }
+
+    // Ensure phone number has + prefix before sending
+    const formattedPhone = ensurePhonePrefix(singlePhone);
+
     setSending(true);
     try {
       // Check for duplicate phone number first
-      const duplicateCheck = await checkDuplicatePhones(eventId, [singlePhone]);
+      const duplicateCheck = await checkDuplicatePhones(eventId, [formattedPhone]);
       if (duplicateCheck.success && duplicateCheck.data.hasDuplicates) {
         const duplicate = duplicateCheck.data.duplicates[0];
         alert(`Phone number ${duplicate.phone} is already registered for guest: ${duplicate.existingGuest}`);
         setSending(false);
         return;
       }
-      
+
       // 1. Add guest
       const addRes = await addGuest(eventId, {
         name: singleName,
-        phone: singlePhone
+        phone: formattedPhone,
+        guestCount: singleGuestCount,
       });
-      
+
       if (!addRes.success) {
-        throw new Error(addRes.message || 'Failed to add guest');
+        throw new Error(addRes.message || "Failed to add guest");
       }
-      
+
       // 2. Send invitation
       await sendInvites(eventId, {
         messageType,
-        guestIds: [addRes.data.guest.id]
+        guestIds: [addRes.data.guest.id],
       });
-      
+
     } catch (err) {
-      console.error('Error in handleSendSingle:', err);
-      alert(`Error: ${err.message || 'Failed to send invitation'}`);
+      console.error("Error in handleSendSingle:", err);
+      alert(`Error: ${err.message || "Failed to send invitation"}`);
     }
     setSending(false);
     onClose();
@@ -152,42 +170,42 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
   // Send bulk
   const handleSendBulk = async () => {
     if (!eventId) {
-      console.error('No event ID provided');
+      console.error("No event ID provided");
       return;
     }
-    
+
     setSending(true);
     try {
-      console.log('Adding guests in bulk:', bulkGuests);
-      
+      console.log("Adding guests in bulk:", bulkGuests);
+
       // 1. Add guests in bulk
       const addRes = await addGuestsBulk(eventId, bulkGuests);
-      console.log('Add guests response:', addRes);
-      
+      console.log("Add guests response:", addRes);
+
       if (!addRes.success || !addRes.data?.createdGuests) {
-        throw new Error(addRes.message || 'Failed to add guests');
+        throw new Error(addRes.message || "Failed to add guests");
       }
-      
+
       const guestIds = addRes.data.createdGuests.map(g => g.id);
-      console.log('Guest IDs to send to:', guestIds);
-      
+      console.log("Guest IDs to send to:", guestIds);
+
       if (guestIds.length === 0) {
-        throw new Error('No guests were successfully added');
+        throw new Error("No guests were successfully added");
       }
-      
+
       // 2. Send invites
       const sendRes = await sendInvites(eventId, {
         messageType,
-        guestIds
+        guestIds,
       });
-      
-      console.log('Send invites request data:', { eventId, messageType, guestIds });
-      console.log('Send invites response:', sendRes);
-      
+
+      console.log("Send invites request data:", { eventId, messageType, guestIds });
+      console.log("Send invites response:", sendRes);
+
     } catch (err) {
-      console.error('Error in handleSendBulk:', err);
+      console.error("Error in handleSendBulk:", err);
       // Show error to user
-      alert(`Error: ${err.message || 'Failed to process bulk upload'}`);
+      alert(`Error: ${err.message || "Failed to process bulk upload"}`);
     }
     setSending(false);
     onClose();
@@ -196,7 +214,17 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
   const handleSinglePhoneChange = (e) => {
     const value = e.target.value;
     setSinglePhone(value);
-    setSinglePhoneError(value && !phoneRegex.test(value) ? 'Invalid phone. Use +countrycode and 9 digits.' : '');
+    setSinglePhoneError(value && !phoneRegex.test(value) ? "Please enter a valid phone number (10-15 digits, with or without +)" : "");
+  };
+
+  // Function to ensure phone number has + prefix
+  const ensurePhonePrefix = (phone) => {
+    if (!phone) {
+      return phone;
+    }
+    // Remove any existing + and add it back
+    const cleanPhone = phone.replace(/^\+/, "");
+    return `+${cleanPhone}`;
   };
 
   return (
@@ -217,7 +245,7 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
           <Button onClick={() => setTab("single")} variant={tab === "single" ? "default" : "outline"}>Add Single</Button>
           <Button onClick={() => setTab("bulk")} variant={tab === "bulk" ? "default" : "outline"}>Bulk Upload</Button>
         </div>
-        
+
         {tab === "single" && (
           <div className="space-y-4">
             {/* Message type selector */}
@@ -226,14 +254,28 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
               <Button variant={messageType === "whatsapp" ? "default" : "outline"} onClick={() => setMessageType("whatsapp")}>WhatsApp</Button>
             </div>
             <Input placeholder="Guest Name" value={singleName} onChange={e => setSingleName(e.target.value)} />
-            <Input placeholder="Phone Number" value={singlePhone} onChange={handleSinglePhoneChange} />
+            <Input placeholder="Phone Number (e.g., 255123456789 or +255123456789)" value={singlePhone} onChange={handleSinglePhoneChange} />
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Number of Guests Allowed</label>
+              <select
+                className="w-full p-2 rounded-lg border text-sm bg-slate-700 text-white"
+                value={singleGuestCount}
+                onChange={e => setSingleGuestCount(Number(e.target.value))}
+              >
+                <option value={1}>Single</option>
+                <option value={2}>Double</option>
+                <option value={3}>Triple</option>
+                <option value={4}>4 Guests</option>
+                <option value={5}>5 Guests</option>
+              </select>
+            </div>
             {singlePhoneError && <div className="text-red-400 text-xs mt-1">{singlePhoneError}</div>}
             <Button onClick={handleSendSingle} disabled={sending || !singleName || !singlePhone || !eventId || singlePhoneError}>
               {sending ? "Sending..." : "Add Guest & Send Invitation"}
             </Button>
           </div>
         )}
-        
+
         {tab === "bulk" && (
           <div className="space-y-4">
             {/* Message type selector */}
@@ -241,22 +283,23 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
               <Button variant={messageType === "sms" ? "default" : "outline"} onClick={() => setMessageType("sms")}>SMS</Button>
               <Button variant={messageType === "whatsapp" ? "default" : "outline"} onClick={() => setMessageType("whatsapp")}>WhatsApp</Button>
             </div>
-            
+
             {/* Instructions */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h4 className="font-semibold text-blue-800 mb-2">📋 Excel File Format Instructions:</h4>
               <div className="text-sm text-blue-700 space-y-1">
                 <p><strong>Column A:</strong> Guest Names (e.g., "John Doe", "Jane Smith")</p>
-                <p><strong>Column B:</strong> Phone Numbers (e.g., "255123456789", "255987654321")</p>
-                <p><strong>Note:</strong> Phone numbers should be in international format without dashes or spaces</p>
+                <p><strong>Column B:</strong> Phone Numbers (e.g., "255123456789", "+255123456789")</p>
+                <p><strong>Column C:</strong> Number of Guests (e.g., 1, 2, 3)</p>
+                <p><strong>Note:</strong> Phone numbers will automatically have "+" prefix added. Use 10-15 digits.</p>
               </div>
             </div>
-            
+
             <Input type="file" accept=".xlsx,.csv" onChange={handleFile} />
-            <div className="text-xs text-slate-400">Upload a .xlsx or .csv file with names in Column A and phone numbers in Column B.</div>
+            <div className="text-xs text-slate-400">Upload a .xlsx or .csv file with names in Column A, phone numbers in Column B, and guest counts in Column C.</div>
             {fileError && <div className="text-red-500">{fileError}</div>}
             {bulkPhoneErrors.length > 0 && (
-              <div className="text-red-400 text-xs mt-1 whitespace-pre-line">{bulkPhoneErrors.join('\n')}</div>
+              <div className="text-red-400 text-xs mt-1 whitespace-pre-line">{bulkPhoneErrors.join("\n")}</div>
             )}
             {bulkGuests.length > 0 && (
               <div>
@@ -267,6 +310,7 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
                       <tr>
                         <th className="text-left">Name</th>
                         <th className="text-left">Phone</th>
+                        <th className="text-left">Guest Count</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -274,6 +318,7 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
                         <tr key={i}>
                           <td>{g.name}</td>
                           <td>{g.phone}</td>
+                          <td>{g.guestCount}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -289,4 +334,4 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
       </DialogContent>
     </Dialog>
   );
-} 
+}

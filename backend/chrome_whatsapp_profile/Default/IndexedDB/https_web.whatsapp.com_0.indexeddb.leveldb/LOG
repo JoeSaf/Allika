@@ -1,39 +1,19 @@
-2025/07/24-17:30:54.523 335ec Reusing MANIFEST /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2025/07/24-17:30:54.524 335ec Recovering log #420
-2025/07/24-17:30:54.699 335ec Reusing old log /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000420.log 
-2025/07/24-17:30:54.703 335ec Delete type=2 #421
-2025/07/24-17:30:54.703 335ec Delete type=2 #419
-2025/07/24-17:30:54.703 335ec Delete type=2 #418
-2025/07/24-17:31:01.419 335ee Level-0 table #426: started
-2025/07/24-17:31:01.638 335ee Level-0 table #426: 1190040 bytes OK
-2025/07/24-17:31:01.642 335ee Delete type=0 #420
-2025/07/24-17:31:01.644 335ed Manual compaction at level-0 from '\x00\x8f\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x90\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/07/24-17:31:04.228 335ee Compacting 1@1 + 2@2 files
-2025/07/24-17:31:04.365 335ee Generated table #427@1: 55424 keys, 2211710 bytes
-2025/07/24-17:31:04.402 335ee Generated table #428@1: 14359 keys, 871459 bytes
-2025/07/24-17:31:04.403 335ee Compacted 1@1 + 2@2 files => 3083169 bytes
-2025/07/24-17:31:04.405 335ee compacted to: files[ 0 0 2 0 0 0 0 ]
-2025/07/24-17:31:04.406 335ee Delete type=2 #423
-2025/07/24-17:31:04.406 335ee Delete type=2 #426
-2025/07/24-17:31:04.407 335ee Delete type=2 #422
-2025/07/24-17:31:17.376 33609 Level-0 table #430: started
-2025/07/24-17:31:17.462 33609 Level-0 table #430: 987079 bytes OK
-2025/07/24-17:31:17.470 33609 Delete type=0 #425
-2025/07/24-17:31:17.474 335ec Manual compaction at level-0 from '\x00\x90\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x91\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/07/24-17:31:20.027 335ed Compacting 1@1 + 2@2 files
-2025/07/24-17:31:20.156 335ed Generated table #431@1: 54755 keys, 2208936 bytes
-2025/07/24-17:31:20.194 335ed Generated table #432@1: 17525 keys, 1137959 bytes
-2025/07/24-17:31:20.194 335ed Compacted 1@1 + 2@2 files => 3346895 bytes
-2025/07/24-17:31:20.200 335ed compacted to: files[ 0 0 2 0 0 0 0 ]
-2025/07/24-17:31:20.201 335ed Delete type=2 #428
-2025/07/24-17:31:20.202 335ed Delete type=2 #427
-2025/07/24-17:31:20.202 335ed Delete type=2 #430
-2025/07/24-17:31:31.560 335ee Level-0 table #434: started
-2025/07/24-17:31:31.643 335ee Level-0 table #434: 239386 bytes OK
-2025/07/24-17:31:31.648 335ee Delete type=0 #429
-2025/07/24-17:31:31.655 335ee Manual compaction at level-0 from '\x00\x91\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x92\x00\x00\x00' @ 0 : 0; will stop at (end)
-2025/07/24-17:31:34.677 335ec Compacting 1@1 + 2@2 files
-2025/07/24-17:31:34.804 335ec Generated table #435@1: 55363 keys, 2208451 bytes
-2025/07/24-17:31:34.874 335ec Generated table #436@1: 18177 keys, 1169483 bytes
-2025/07/24-17:31:34.874 335ec Compacted 1@1 + 2@2 files => 3377934 bytes
-2025/07/24-17:31:34.878 335ec compacted to: files[ 0 0 2 0 0 0 0 ]
+2025/07/26-17:33:58.238 b839 Reusing MANIFEST /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/07/26-17:33:58.253 b839 Recovering log #787
+2025/07/26-17:33:58.381 b839 Reusing old log /home/lukagocharov/Documents/GitHub/Allika/backend/chrome_whatsapp_profile/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/000787.log 
+2025/07/26-17:34:01.500 b83b Level-0 table #795: started
+2025/07/26-17:34:01.562 b83b Level-0 table #795: 412446 bytes OK
+2025/07/26-17:34:01.570 b83b Delete type=0 #787
+2025/07/26-17:34:01.580 b839 Manual compaction at level-0 from '\x00\xef\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\xf0\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/07/26-17:34:04.336 b84e Compacting 1@1 + 4@2 files
+2025/07/26-17:34:04.715 b84e Generated table #796@1: 62330 keys, 2217925 bytes
+2025/07/26-17:34:04.773 b84e Generated table #797@1: 9396 keys, 2164920 bytes
+2025/07/26-17:34:04.835 b84e Generated table #798@1: 25644 keys, 2157400 bytes
+2025/07/26-17:34:04.994 b84e Generated table #799@1: 39465 keys, 614534 bytes
+2025/07/26-17:34:04.994 b84e Compacted 1@1 + 4@2 files => 7154779 bytes
+2025/07/26-17:34:04.997 b84e compacted to: files[ 0 0 4 0 0 0 0 ]
+2025/07/26-17:34:04.998 b84e Delete type=2 #789
+2025/07/26-17:34:04.998 b84e Delete type=2 #795
+2025/07/26-17:34:04.998 b84e Delete type=2 #792
+2025/07/26-17:34:04.998 b84e Delete type=2 #791
+2025/07/26-17:34:04.998 b84e Delete type=2 #790

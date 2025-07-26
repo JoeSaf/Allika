@@ -11,7 +11,13 @@ router.use(authenticateToken);
 
 // POST /api/events - Create new event
 router.post('/', validateCreateEvent, async (req, res) => {
+  const pool = getPool();
+  const connection = await pool.getConnection();
+  
   try {
+    // Start transaction
+    await connection.beginTransaction();
+    
     const userId = req.user.id;
     const {
       title,
@@ -29,11 +35,10 @@ router.post('/', validateCreateEvent, async (req, res) => {
       dateLang
     } = req.body;
 
-    const pool = getPool();
     const eventId = generateId();
 
     // Create event
-    await pool.execute(
+    await connection.execute(
       `INSERT INTO events (
         id, user_id, title, type, date, time, venue, additional_info, inviting_family, reception, reception_time, theme, rsvp_contact, rsvp_contact_secondary, date_lang
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -45,7 +50,7 @@ router.post('/', validateCreateEvent, async (req, res) => {
     );
 
     // Verify event was created
-    const [events] = await pool.execute(
+    const [events] = await connection.execute(
       `SELECT * FROM events WHERE id = ?`,
       [eventId]
     );
@@ -113,7 +118,7 @@ router.post('/', validateCreateEvent, async (req, res) => {
         break;
     }
     
-    await pool.execute(
+    await connection.execute(
       `INSERT INTO rsvp_settings (
         id, event_id, title, subtitle, location, welcome_message,
         confirm_text, decline_text, guest_count_enabled, guest_count_label,
@@ -136,12 +141,17 @@ router.post('/', validateCreateEvent, async (req, res) => {
     );
 
     // Get created event with RSVP settings
-    const [finalEvents] = await pool.execute(
+    const [finalEvents] = await connection.execute(
       `SELECT e.*, rs.* FROM events e
        LEFT JOIN rsvp_settings rs ON e.id = rs.event_id
        WHERE e.id = ?`,
       [eventId]
     );
+
+    // Commit the transaction
+    await connection.commit();
+    
+    console.log('Event transaction committed successfully:', { eventId, userId, title });
 
     res.status(201).json({
       success: true,
@@ -153,10 +163,22 @@ router.post('/', validateCreateEvent, async (req, res) => {
 
   } catch (error) {
     console.error('Create event error:', error);
+    
+    // Rollback transaction on error
+    try {
+      await connection.rollback();
+      console.log('Event creation transaction rolled back');
+    } catch (rollbackError) {
+      console.error('Error rolling back transaction:', rollbackError);
+    }
+    
     res.status(500).json({
       error: true,
       message: 'Error creating event'
     });
+  } finally {
+    // Release the connection
+    connection.release();
   }
 });
 

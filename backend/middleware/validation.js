@@ -195,9 +195,6 @@ export const validateBulkGuestUpload = [
 
 // RSVP validation rules
 export const validateRSVPResponse = [
-  param('token')
-    .isLength({ min: 32, max: 255 })
-    .withMessage('Invalid RSVP token'),
   body('response')
     .isIn(['confirmed', 'declined'])
     .withMessage('Response must be either confirmed or declined'),

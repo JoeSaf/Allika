@@ -5,7 +5,7 @@ export interface Guest {
   email: string;
   phone?: string;
   table?: string;
-  status: 'pending' | 'confirmed' | 'declined';
+  status: "pending" | "confirmed" | "declined";
   checkedIn: boolean;
   checkInTime?: string;
   rsvpDate?: string;
@@ -30,7 +30,7 @@ export interface Event {
   invitingFamily?: string;
   invitationImage?: string;
   image?: string;
-  status: 'draft' | 'active' | 'completed';
+  status: "draft" | "active" | "completed";
   guests: Guest[];
   createdAt: string;
   messagesSent: number;
@@ -66,7 +66,7 @@ export interface Event {
     additionalFields: Array<{
       id: string;
       label: string;
-      type: 'text' | 'textarea' | 'select';
+      type: "text" | "textarea" | "select";
       required: boolean;
       options?: string[];
     }>;
@@ -97,21 +97,23 @@ export interface Analytics {
 
 // Storage keys
 const STORAGE_KEYS = {
-  EVENTS: 'alika_events',
-  GUESTS: 'alika_guests',
-  ANALYTICS: 'alika_analytics',
-  CURRENT_EVENT: 'alika_current_event'
+  EVENTS: "alika_events",
+  GUESTS: "alika_guests",
+  ANALYTICS: "alika_analytics",
+  CURRENT_EVENT: "alika_current_event",
 } as const;
 
 // Helper function to safely parse JSON
 const safeJSONParse = <T>(jsonString: string | null, defaultValue: T): T => {
-  if (!jsonString) return defaultValue;
-  
+  if (!jsonString) {
+    return defaultValue;
+  }
+
   try {
     const parsed = JSON.parse(jsonString);
     return parsed || defaultValue;
   } catch (error) {
-    console.warn('Error parsing JSON from localStorage:', error);
+    console.warn("Error parsing JSON from localStorage:", error);
     return defaultValue;
   }
 };
@@ -122,7 +124,7 @@ const safeJSONStringify = (key: string, data: any): void => {
     localStorage.setItem(key, JSON.stringify(data));
     console.log(`Saved ${key} data:`, data);
   } catch (error) {
-    console.error('Error storing data to localStorage:', error);
+    console.error("Error storing data to localStorage:", error);
     throw new Error(`Failed to save ${key} data`);
   }
 };
@@ -132,7 +134,7 @@ export const saveEvent = (event: Event): void => {
   try {
     const events = getEvents();
     const existingIndex = events.findIndex(e => e.id === event.id);
-    
+
     if (existingIndex >= 0) {
       events[existingIndex] = { ...events[existingIndex], ...event };
       console.log(`Updated existing event: ${event.title}`, event);
@@ -140,13 +142,13 @@ export const saveEvent = (event: Event): void => {
       events.push(event);
       console.log(`Added new event: ${event.title}`, event);
     }
-    
+
     safeJSONStringify(STORAGE_KEYS.EVENTS, events);
-    
+
     // Update analytics after saving
     updateAnalytics(event);
   } catch (error) {
-    console.error('Error saving event:', error);
+    console.error("Error saving event:", error);
     throw error;
   }
 };
@@ -156,17 +158,17 @@ export const saveEventDetails = (eventId: string, details: Partial<Event>): void
   try {
     const events = getEvents();
     const existingIndex = events.findIndex(e => e.id === eventId);
-    
+
     if (existingIndex >= 0) {
       // Merge the new details with existing event
       events[existingIndex] = {
         ...events[existingIndex],
-        ...details
+        ...details,
       };
-      
+
       console.log(`Updated event details for: ${eventId}`, events[existingIndex]);
       safeJSONStringify(STORAGE_KEYS.EVENTS, events);
-      
+
       // Update analytics
       updateAnalytics(events[existingIndex]);
     } else {
@@ -174,7 +176,7 @@ export const saveEventDetails = (eventId: string, details: Partial<Event>): void
       throw new Error(`Event not found: ${eventId}`);
     }
   } catch (error) {
-    console.error('Error saving event details:', error);
+    console.error("Error saving event details:", error);
     throw error;
   }
 };
@@ -186,7 +188,7 @@ export const saveInvitationData = (eventId: string, invitationData: any): void =
     if (!event) {
       throw new Error(`Event not found: ${eventId}`);
     }
-    
+
     // Update the event with invitation data
     const updatedEvent = {
       ...event,
@@ -203,13 +205,13 @@ export const saveInvitationData = (eventId: string, invitationData: any): void =
       rsvpContactSecondary: invitationData.rsvpContactSecondary || event.rsvpContactSecondary,
       additionalInfo: invitationData.additionalInfo || event.additionalInfo,
       invitingFamily: invitationData.invitingFamily || event.invitingFamily,
-      invitationImage: invitationData.invitationImage || event.invitationImage
+      invitationImage: invitationData.invitationImage || event.invitationImage,
     };
-    
+
     saveEvent(updatedEvent);
-    console.log('Saved invitation data:', invitationData);
+    console.log("Saved invitation data:", invitationData);
   } catch (error) {
-    console.error('Error saving invitation data:', error);
+    console.error("Error saving invitation data:", error);
     throw error;
   }
 };
@@ -221,19 +223,19 @@ export const saveRsvpSettings = (eventId: string, rsvpSettings: any): void => {
     if (!event) {
       throw new Error(`Event not found: ${eventId}`);
     }
-    
+
     const updatedEvent = {
       ...event,
       rsvpSettings: {
         ...event.rsvpSettings,
-        ...rsvpSettings
-      }
+        ...rsvpSettings,
+      },
     };
-    
+
     saveEvent(updatedEvent);
-    console.log('Saved RSVP settings:', rsvpSettings);
+    console.log("Saved RSVP settings:", rsvpSettings);
   } catch (error) {
-    console.error('Error saving RSVP settings:', error);
+    console.error("Error saving RSVP settings:", error);
     throw error;
   }
 };
@@ -244,7 +246,7 @@ export const getEvents = (): Event[] => {
     console.log(`Retrieved ${events.length} events from storage`);
     return events;
   } catch (error) {
-    console.error('Error getting events:', error);
+    console.error("Error getting events:", error);
     return [];
   }
 };
@@ -260,7 +262,7 @@ export const getEvent = (id: string): Event | null => {
     }
     return event;
   } catch (error) {
-    console.error('Error getting event:', error);
+    console.error("Error getting event:", error);
     return null;
   }
 };
@@ -269,20 +271,20 @@ export const deleteEvent = (id: string): void => {
   try {
     const events = getEvents().filter(e => e.id !== id);
     safeJSONStringify(STORAGE_KEYS.EVENTS, events);
-    
+
     // Clean up related data
     const analytics = getAnalytics().filter(a => a.eventId !== id);
     safeJSONStringify(STORAGE_KEYS.ANALYTICS, analytics);
-    
+
     // Clear current event if it's the one being deleted
     const currentEventId = localStorage.getItem(STORAGE_KEYS.CURRENT_EVENT);
     if (currentEventId === id) {
       localStorage.removeItem(STORAGE_KEYS.CURRENT_EVENT);
     }
-    
+
     console.log(`Deleted event with id: ${id}`);
   } catch (error) {
-    console.error('Error deleting event:', error);
+    console.error("Error deleting event:", error);
     throw error;
   }
 };
@@ -294,18 +296,18 @@ export const saveGuest = (eventId: string, guest: Guest): void => {
     if (!event) {
       throw new Error(`Event not found: ${eventId}`);
     }
-    
+
     const existingIndex = event.guests.findIndex(g => g.id === guest.id);
-    
+
     if (existingIndex >= 0) {
       event.guests[existingIndex] = guest;
     } else {
       event.guests.push(guest);
     }
-    
+
     saveEvent(event);
   } catch (error) {
-    console.error('Error saving guest:', error);
+    console.error("Error saving guest:", error);
     throw error;
   }
 };
@@ -315,7 +317,7 @@ export const getGuests = (eventId: string): Guest[] => {
     const event = getEvent(eventId);
     return event ? event.guests : [];
   } catch (error) {
-    console.error('Error getting guests:', error);
+    console.error("Error getting guests:", error);
     return [];
   }
 };
@@ -323,18 +325,22 @@ export const getGuests = (eventId: string): Guest[] => {
 export const checkInGuest = (eventId: string, guestId: string): boolean => {
   try {
     const event = getEvent(eventId);
-    if (!event) return false;
-    
+    if (!event) {
+      return false;
+    }
+
     const guest = event.guests.find(g => g.id === guestId);
-    if (!guest || guest.checkedIn) return false;
-    
+    if (!guest || guest.checkedIn) {
+      return false;
+    }
+
     guest.checkedIn = true;
-    guest.checkInTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
+    guest.checkInTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
     saveEvent(event);
     return true;
   } catch (error) {
-    console.error('Error checking in guest:', error);
+    console.error("Error checking in guest:", error);
     return false;
   }
 };
@@ -344,13 +350,13 @@ export const updateAnalytics = (event: Event): void => {
   try {
     const analytics = getAnalytics();
     const existingIndex = analytics.findIndex(a => a.eventId === event.id);
-    
-    const confirmed = event.guests.filter(g => g.status === 'confirmed').length;
-    const declined = event.guests.filter(g => g.status === 'declined').length;
-    const pending = event.guests.filter(g => g.status === 'pending').length;
+
+    const confirmed = event.guests.filter(g => g.status === "confirmed").length;
+    const declined = event.guests.filter(g => g.status === "declined").length;
+    const pending = event.guests.filter(g => g.status === "pending").length;
     const responded = confirmed + declined;
     const responseRate = event.messagesSent > 0 ? (responded / event.messagesSent) * 100 : 0;
-    
+
     const analyticsData: Analytics = {
       eventId: event.id,
       totalInvitations: event.guests.length,
@@ -362,18 +368,18 @@ export const updateAnalytics = (event: Event): void => {
       declined,
       pending,
       responseRate: Math.round(responseRate * 10) / 10,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
-    
+
     if (existingIndex >= 0) {
       analytics[existingIndex] = analyticsData;
     } else {
       analytics.push(analyticsData);
     }
-    
+
     safeJSONStringify(STORAGE_KEYS.ANALYTICS, analytics);
   } catch (error) {
-    console.error('Error updating analytics:', error);
+    console.error("Error updating analytics:", error);
   }
 };
 
@@ -381,7 +387,7 @@ export const getAnalytics = (): Analytics[] => {
   try {
     return safeJSONParse(localStorage.getItem(STORAGE_KEYS.ANALYTICS), []);
   } catch (error) {
-    console.error('Error getting analytics:', error);
+    console.error("Error getting analytics:", error);
     return [];
   }
 };
@@ -391,7 +397,7 @@ export const getEventAnalytics = (eventId: string): Analytics | null => {
     const analytics = getAnalytics();
     return analytics.find(a => a.eventId === eventId) || null;
   } catch (error) {
-    console.error('Error getting event analytics:', error);
+    console.error("Error getting event analytics:", error);
     return null;
   }
 };
@@ -402,7 +408,7 @@ export const setCurrentEvent = (eventId: string): void => {
     localStorage.setItem(STORAGE_KEYS.CURRENT_EVENT, eventId);
     console.log(`Set current event: ${eventId}`);
   } catch (error) {
-    console.error('Error setting current event:', error);
+    console.error("Error setting current event:", error);
   }
 };
 
@@ -410,20 +416,49 @@ export const getCurrentEvent = (): Event | null => {
   try {
     const eventId = localStorage.getItem(STORAGE_KEYS.CURRENT_EVENT);
     if (!eventId) {
-      console.log('No current event set');
+      console.log("No current event set");
       return null;
     }
-    
+
     const event = getEvent(eventId);
     if (!event) {
       // Clean up invalid current event
       localStorage.removeItem(STORAGE_KEYS.CURRENT_EVENT);
-      console.warn('Current event not found, cleared from storage');
+      console.warn("Current event not found, cleared from storage");
     }
     return event;
   } catch (error) {
-    console.error('Error getting current event:', error);
+    console.error("Error getting current event:", error);
     return null;
+  }
+};
+
+// New function to clear stale event data
+export const clearStaleEventData = (): void => {
+  try {
+    console.log("[Storage] Clearing stale event data");
+
+    // Clear localStorage
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_EVENT);
+    localStorage.removeItem("alika_event_creation_lock");
+    localStorage.removeItem("alika_event_timestamp");
+    localStorage.removeItem("alika_event_session");
+
+    // Clear sessionStorage
+    sessionStorage.removeItem("alika_current_event");
+    sessionStorage.removeItem("alika_event_session");
+
+    // Clear window properties
+    if ((window as any).alikaCurrentEventId) {
+      delete (window as any).alikaCurrentEventId;
+    }
+    if ((window as any).alikaEventSession) {
+      delete (window as any).alikaEventSession;
+    }
+
+    console.log("[Storage] Stale event data cleared successfully");
+  } catch (error) {
+    console.error("Error clearing stale event data:", error);
   }
 };
 
@@ -431,17 +466,21 @@ export const getCurrentEvent = (): Event | null => {
 export const simulateQRScan = (eventId: string): Guest | null => {
   try {
     const event = getEvent(eventId);
-    if (!event) return null;
-    
+    if (!event) {
+      return null;
+    }
+
     const pendingGuests = event.guests.filter(g => !g.checkedIn);
-    if (pendingGuests.length === 0) return null;
-    
+    if (pendingGuests.length === 0) {
+      return null;
+    }
+
     const randomGuest = pendingGuests[Math.floor(Math.random() * pendingGuests.length)];
     const success = checkInGuest(eventId, randomGuest.id);
-    
+
     return success ? randomGuest : null;
   } catch (error) {
-    console.error('Error simulating QR scan:', error);
+    console.error("Error simulating QR scan:", error);
     return null;
   }
 };
@@ -449,16 +488,20 @@ export const simulateQRScan = (eventId: string): Guest | null => {
 export const generateGuestQRCode = async (eventId: string, guestId: string): Promise<string | null> => {
   try {
     const event = getEvent(eventId);
-    if (!event) return null;
-    
+    if (!event) {
+      return null;
+    }
+
     const guest = event.guests.find(g => g.id === guestId);
-    if (!guest) return null;
-    
-    const { generateQRCodeData, generateQRCodeString } = await import('./qrCodeGenerator');
+    if (!guest) {
+      return null;
+    }
+
+    const { generateQRCodeData, generateQRCodeString } = await import("./qrCodeGenerator");
     const qrData = generateQRCodeData(guest, event);
     return await generateQRCodeString(qrData);
   } catch (error) {
-    console.error('Failed to generate QR code:', error);
+    console.error("Failed to generate QR code:", error);
     return null;
   }
 };
@@ -466,12 +509,14 @@ export const generateGuestQRCode = async (eventId: string, guestId: string): Pro
 export const generateEventQRCodes = async (eventId: string): Promise<Array<{guest: Guest, qrCode: string}> | null> => {
   try {
     const event = getEvent(eventId);
-    if (!event) return null;
-    
-    const { generateBulkQRCodes } = await import('./qrCodeGenerator');
+    if (!event) {
+      return null;
+    }
+
+    const { generateBulkQRCodes } = await import("./qrCodeGenerator");
     return await generateBulkQRCodes(event.guests, event);
   } catch (error) {
-    console.error('Failed to generate bulk QR codes:', error);
+    console.error("Failed to generate bulk QR codes:", error);
     return null;
   }
 };
@@ -482,9 +527,9 @@ export const clearAllData = (): void => {
     Object.values(STORAGE_KEYS).forEach(key => {
       localStorage.removeItem(key);
     });
-    console.log('Cleared all app data from localStorage');
+    console.log("Cleared all app data from localStorage");
   } catch (error) {
-    console.error('Error clearing data:', error);
+    console.error("Error clearing data:", error);
   }
 };
 
@@ -493,6 +538,6 @@ export const getStorageInfo = (): Record<string, any> => {
     events: getEvents().length,
     analytics: getAnalytics().length,
     currentEvent: localStorage.getItem(STORAGE_KEYS.CURRENT_EVENT),
-    storageKeys: STORAGE_KEYS
+    storageKeys: STORAGE_KEYS,
   };
 };

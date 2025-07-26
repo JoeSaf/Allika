@@ -1,45 +1,45 @@
 
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { 
-  BarChart3, 
-  Users, 
-  CheckCircle, 
-  Clock, 
-  Mail, 
-  Phone, 
-  Plus, 
-  Search, 
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  BarChart3,
+  Users,
+  CheckCircle,
+  Clock,
+  Mail,
+  Phone,
+  Plus,
+  Search,
   Scan,
-  ArrowLeft
-} from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+  ArrowLeft,
+} from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
-} from 'recharts';
-import { useToast } from '@/hooks/use-toast';
-import { 
-  getEvent, 
-  getEventAnalytics, 
-  getGuests, 
-  addGuest, 
-  addGuestsBulk, 
-  sendInvites
-} from '@/services/api';
-import SendInvitationModal from '@/components/SendInvitationModal';
+  Cell,
+} from "recharts";
+import { useToast } from "@/hooks/use-toast";
+import {
+  getEvent,
+  getEventAnalytics,
+  getGuests,
+  addGuest,
+  addGuestsBulk,
+  sendInvites,
+} from "@/services/api";
+import SendInvitationModal from "@/components/SendInvitationModal";
 
 interface Guest {
   id: string;
@@ -68,18 +68,16 @@ const ViewAnalytics = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [event, setEvent] = useState<Event | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [showAddGuestModal, setShowAddGuestModal] = useState(false);
   const [showSendInvitationModal, setShowSendInvitationModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  
-
 
   useEffect(() => {
     if (eventId) {
@@ -90,30 +88,34 @@ const ViewAnalytics = () => {
   const loadEventData = async () => {
     try {
       setLoading(true);
-      
+
       const [eventRes, guestsRes, analyticsRes] = await Promise.all([
         getEvent(eventId!),
         getGuests(eventId!),
-        getEventAnalytics(eventId!)
+        getEventAnalytics(eventId!),
       ]);
 
-      if (eventRes.success) setEvent(eventRes.data.event);
-      if (guestsRes.success) setGuests(guestsRes.data.guests);
-      if (analyticsRes.success) setAnalytics(analyticsRes.data);
-      
+      if (eventRes.success) {
+        setEvent(eventRes.data.event);
+      }
+      if (guestsRes.success) {
+        setGuests(guestsRes.data.guests);
+      }
+      if (analyticsRes.success) {
+        setAnalytics(analyticsRes.data);
+      }
+
     } catch (error) {
-      console.error('Error loading event data:', error);
+      console.error("Error loading event data:", error);
       toast({
         title: "Error",
         description: "Failed to load event data.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
-
-
 
   const handleManualCheckIn = async (guestId: string) => {
     setIsProcessing(true);
@@ -123,15 +125,15 @@ const ViewAnalytics = () => {
       if (guest) {
         // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         // Update local state
-        const updatedGuests = guests.map(g => 
-          g.id === guestId 
+        const updatedGuests = guests.map(g =>
+          g.id === guestId
             ? { ...g, checked_in: true, check_in_time: new Date().toLocaleTimeString() }
-            : g
+            : g,
         );
         setGuests(updatedGuests);
-        
+
         toast({
           title: "Guest Checked In",
           description: `${guest.name} has been checked in successfully!`,
@@ -141,7 +143,7 @@ const ViewAnalytics = () => {
       toast({
         title: "Error",
         description: "Failed to check in guest.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsProcessing(false);
@@ -151,7 +153,7 @@ const ViewAnalytics = () => {
   const filteredGuests = guests.filter(guest =>
     guest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (guest.email && guest.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (guest.phone && guest.phone.includes(searchQuery))
+    (guest.phone && guest.phone.includes(searchQuery)),
   );
 
   const checkedInGuests = guests.filter(g => g.checked_in);
@@ -179,9 +181,9 @@ const ViewAnalytics = () => {
         <div className="container mx-auto px-4 py-8 pt-24">
           <div className="flex items-center gap-4 mb-8 justify-between">
             <div className="flex items-center gap-4">
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/dashboard')}
+              <Button
+                variant="outline"
+                onClick={() => navigate("/dashboard")}
                 className="border-slate-600 text-slate-300 hover:bg-slate-700"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -249,7 +251,7 @@ const ViewAnalytics = () => {
             <CardContent>
               <div className="text-2xl font-bold text-purple-400">
                 {guests.length > 0 ? Math.round((checkedInGuests.length / guests.length) * 100) : 0}%
-        </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -273,7 +275,7 @@ const ViewAnalytics = () => {
               {filteredGuests.map((guest) => (
                 <div key={guest.id} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
                   <div className="flex items-center gap-4">
-                      <div>
+                    <div>
                       <p className="text-white font-medium">{guest.name}</p>
                       <div className="flex items-center gap-4 text-sm text-slate-400">
                         {guest.email && (
@@ -309,17 +311,15 @@ const ViewAnalytics = () => {
                         Check In
                       </Button>
                     )}
-                    </div>
                   </div>
-                ))}
+                </div>
+              ))}
               {filteredGuests.length === 0 && (
                 <p className="text-slate-400 text-center py-4">No guests found</p>
               )}
-              </div>
+            </div>
           </CardContent>
         </Card>
-
-
 
         {/* Add Guest Modal */}
         <Dialog open={showAddGuestModal} onOpenChange={setShowAddGuestModal}>

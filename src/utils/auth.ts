@@ -1,12 +1,14 @@
-import { apiService } from '@/services/api';
+import { apiService } from "@/services/api";
+import { STORAGE_KEYS } from "@/constants";
+import { setLocalStorage, getLocalStorage, removeLocalStorage } from "@/utils/helpers";
 
 export interface User {
   id: string;
   name: string;
   email: string;
   phone?: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AuthResponse {
@@ -15,35 +17,45 @@ export interface AuthResponse {
 }
 
 export const isUserLoggedIn = (): boolean => {
-  const token = localStorage.getItem('alika_token');
+  const token = getLocalStorage<string>(STORAGE_KEYS.AUTH_TOKEN);
   return !!token;
 };
 
 export const getCurrentUser = (): User | null => {
-  const userData = localStorage.getItem('alika_user');
-  if (!userData) return null;
-  
-  try {
-    return JSON.parse(userData) as User;
-  } catch (error) {
-    console.error('Error parsing user data:', error);
-    return null;
-  }
+  return getLocalStorage<User>(STORAGE_KEYS.USER_DATA);
 };
 
 export const getAuthToken = (): string | null => {
-  return localStorage.getItem('alika_token');
+  return getLocalStorage<string>(STORAGE_KEYS.AUTH_TOKEN);
 };
 
 export const logoutUser = (): void => {
-  localStorage.removeItem('alika_user');
-  localStorage.removeItem('alika_token');
+  removeLocalStorage(STORAGE_KEYS.USER_DATA);
+  removeLocalStorage(STORAGE_KEYS.AUTH_TOKEN);
+
+  // Clear any event-related data
+  removeLocalStorage("alika_current_event");
+  removeLocalStorage("alika_event_creation_lock");
+  removeLocalStorage("alika_event_timestamp");
+  removeLocalStorage("alika_event_session");
+
+  // Clear sessionStorage
+  sessionStorage.removeItem("alika_current_event");
+  sessionStorage.removeItem("alika_event_session");
+
+  // Clear window properties
+  if ((window as any).alikaCurrentEventId) {
+    delete (window as any).alikaCurrentEventId;
+  }
+  if ((window as any).alikaEventSession) {
+    delete (window as any).alikaEventSession;
+  }
 };
 
 export const requireLogin = (returnUrl?: string): string => {
   const params = new URLSearchParams();
   if (returnUrl) {
-    params.set('returnUrl', returnUrl);
+    params.set("returnUrl", returnUrl);
   }
   return `/login?${params.toString()}`;
 };
@@ -57,17 +69,16 @@ export const registerUser = async (userData: {
 }): Promise<{ success: boolean; message: string }> => {
   try {
     const response = await apiService.register(userData);
-    
+
     if (response.success) {
-      return { 
-        success: true, 
-        message: response.message || 'Registration successful' 
+      return {
+        success: true,
+        message: response.message || "Registration successful",
       };
     } else {
-      throw new Error(response.message || 'Registration failed');
+      throw new Error(response.message || "Registration failed");
     }
   } catch (error) {
-    console.error('Registration error:', error);
     throw error;
   }
 };
@@ -78,20 +89,42 @@ export const loginUser = async (credentials: {
 }): Promise<AuthResponse> => {
   try {
     const response = await apiService.login(credentials);
-    
+
     if (response.success && response.data) {
       const { user, token } = response.data;
-      
+
       // Store user data and token
-      localStorage.setItem('alika_user', JSON.stringify(user));
-      localStorage.setItem('alika_token', token);
-      
+      setLocalStorage(STORAGE_KEYS.USER_DATA, user);
+      setLocalStorage(STORAGE_KEYS.AUTH_TOKEN, token);
+
+      // Clear any stale event IDs that might cause access issues
+      const currentEventId = getLocalStorage<string>("alika_current_event");
+      if (currentEventId) {
+        removeLocalStorage("alika_current_event");
+      }
+
+      // Clear event creation locks
+      removeLocalStorage("alika_event_creation_lock");
+      removeLocalStorage("alika_event_timestamp");
+      removeLocalStorage("alika_event_session");
+
+      // Clear sessionStorage as well
+      sessionStorage.removeItem("alika_current_event");
+      sessionStorage.removeItem("alika_event_session");
+
+      // Clear window properties
+      if ((window as any).alikaCurrentEventId) {
+        delete (window as any).alikaCurrentEventId;
+      }
+      if ((window as any).alikaEventSession) {
+        delete (window as any).alikaEventSession;
+      }
+
       return { user, token };
     } else {
-      throw new Error(response.message || 'Login failed');
+      throw new Error(response.message || "Login failed");
     }
   } catch (error) {
-    console.error('Login error:', error);
     throw error;
   }
 };
@@ -104,13 +137,13 @@ export const fetchCurrentUser = async (): Promise<User | null> => {
     }
 
     const response = await apiService.getCurrentUser();
-    
+
     if (response.success && response.data) {
       const user = response.data.user;
-      
+
       // Update stored user data
-      localStorage.setItem('alika_user', JSON.stringify(user));
-      
+      setLocalStorage(STORAGE_KEYS.USER_DATA, user);
+
       return user;
     } else {
       // Token might be invalid, clear storage
@@ -118,7 +151,6 @@ export const fetchCurrentUser = async (): Promise<User | null> => {
       return null;
     }
   } catch (error) {
-    console.error('Fetch current user error:', error);
     // Token might be invalid, clear storage
     logoutUser();
     return null;
@@ -131,12 +163,11 @@ export const changePassword = async (passwords: {
 }): Promise<void> => {
   try {
     const response = await apiService.changePassword(passwords);
-    
+
     if (!response.success) {
-      throw new Error(response.message || 'Password change failed');
+      throw new Error(response.message || "Password change failed");
     }
   } catch (error) {
-    console.error('Change password error:', error);
     throw error;
   }
 };
@@ -145,17 +176,16 @@ export const changePassword = async (passwords: {
 export const validateAndRefreshUser = async (): Promise<User | null> => {
   const user = getCurrentUser();
   const token = getAuthToken();
-  
+
   if (!user || !token) {
     return null;
   }
-  
+
   // Try to fetch fresh user data
   try {
     const freshUser = await fetchCurrentUser();
     return freshUser;
   } catch (error) {
-    console.error('Failed to refresh user data:', error);
     return user; // Return cached user data if refresh fails
   }
 };

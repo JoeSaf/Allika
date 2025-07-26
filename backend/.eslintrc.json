@@ -1,0 +1,53 @@
+{
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "prettier"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "plugins": [
+    "node"
+  ],
+  "rules": {
+    "indent": ["error", 2],
+    "linebreak-style": ["error", "unix"],
+    "quotes": ["error", "double"],
+    "semi": ["error", "always"],
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "no-console": "warn",
+    "no-debugger": "error",
+    "no-alert": "warn",
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+    "no-script-url": "error",
+    "eqeqeq": ["error", "always"],
+    "curly": ["error", "all"],
+    "brace-style": ["error", "1tbs"],
+    "comma-dangle": ["error", "always-multiline"],
+    "object-curly-spacing": ["error", "always"],
+    "array-bracket-spacing": ["error", "never"],
+    "space-before-blocks": "error",
+    "keyword-spacing": "error",
+    "space-infix-ops": "error",
+    "eol-last": "error",
+    "no-trailing-spaces": "error",
+    "no-multiple-empty-lines": ["error", { "max": 1 }],
+    "prefer-const": "error",
+    "no-var": "error",
+    "node/no-unsupported-features/es-syntax": "off",
+    "node/no-missing-import": "off"
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "dist/",
+    "build/",
+    "*.min.js"
+  ]
+} 

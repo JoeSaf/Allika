@@ -86,27 +86,32 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
     const failedMessages = [];
 
     if (messageType === 'whatsapp') {
-      // WhatsApp bulk send (handle all guests at once)
+      // WhatsApp send using send_whatsapp.py for each guest individually
       for (const guest of guests) {
-        const phone = guest.phone;
-        const message = generateMessageContent(event, guest, messageType, customMessage);
-        const tempMsgPath = path.join('/tmp', `wa_msg_${guest.id}_${Date.now()}.txt`);
-        fs.writeFileSync(tempMsgPath, message, 'utf8');
         try {
+          const message = generateMessageContent(event, guest, messageType, customMessage);
+          const messageId = generateId();
+          
+          // Create temporary message file
+          const tempMessageFile = path.join('/tmp', `wa_msg_${eventId}_${guest.id}_${Date.now()}.txt`);
+          fs.writeFileSync(tempMessageFile, message, 'utf8');
+          
+          // Send WhatsApp message using send_whatsapp.py
           await new Promise((resolve, reject) => {
-            exec(`python3 send_whatsapp.py "${phone}" "${tempMsgPath}"`, { cwd: path.resolve(__dirname, '../') }, (error, stdout, stderr) => {
+            exec(`python3 send_whatsapp.py "${guest.phone}" "${tempMessageFile}"`, { cwd: path.resolve(__dirname, '../') }, (error, stdout, stderr) => {
               if (error) return reject(stderr || error.message);
               resolve(stdout);
             });
           });
+          
           // Mark as sent
-          const messageId = generateId();
           await pool.execute(
             `INSERT INTO message_logs (
               id, event_id, guest_id, message_type, recipient, message_content, status, sent_at
             ) VALUES (?, ?, ?, ?, ?, ?, 'sent', CURRENT_TIMESTAMP)`,
             [messageId, eventId, guest.id, messageType, guest.phone, message]
           );
+          
           sentMessages.push({
             guestId: guest.id,
             guestName: guest.name,
@@ -114,22 +119,36 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
             messageId,
             status: 'sent'
           });
+          
+          // Clean up temporary file
+          fs.unlinkSync(tempMessageFile);
+          
+          // Add delay between messages to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
         } catch (waError) {
+          const message = generateMessageContent(event, guest, messageType, customMessage);
           const messageId = generateId();
+          
           await pool.execute(
             `INSERT INTO message_logs (
               id, event_id, guest_id, message_type, recipient, message_content, status, error_message
             ) VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)`,
             [messageId, eventId, guest.id, messageType, guest.phone, message, waError.toString()]
           );
+          
           failedMessages.push({
             guestId: guest.id,
             guestName: guest.name,
             recipient: guest.phone,
             error: waError.toString()
           });
-        } finally {
-          fs.unlinkSync(tempMsgPath);
+          
+          // Clean up temporary file if it exists
+          const tempMessageFile = path.join('/tmp', `wa_msg_${eventId}_${guest.id}_${Date.now()}.txt`);
+          if (fs.existsSync(tempMessageFile)) {
+            fs.unlinkSync(tempMessageFile);
+          }
         }
       }
     } else {

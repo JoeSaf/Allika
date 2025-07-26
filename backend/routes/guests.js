@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { getPool } from '../config/database.js';
 import { authenticateToken, requireEventOwnership } from '../middleware/auth.js';
 import { validateCreateGuest, validateBulkGuestUpload, validateUUID, validateEventId } from '../middleware/validation.js';
@@ -316,16 +316,24 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
 });
 
 // Helper to parse XLSX buffer to guest objects
-function parseXLSXGuests(buffer) {
-  const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-  // Expect: first column = name, second column = phone
+async function parseXLSXGuests(buffer) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const worksheet = workbook.worksheets[0];
+  const rows = [];
+  worksheet.eachRow((row) => {
+    rows.push(row.values.slice(1)); // remove first undefined
+  });
+  // Expect: first column = name, second column = phone, third = guestCount
   const guests = [];
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row[0] || !row[1]) continue; // skip if missing name or phone
-    guests.push({ name: String(row[0]).trim(), phone: String(row[1]).trim() });
+  for (let i = 1; i < rows.length; i++) { // skip header
+    const [name, phone, guestCountRaw] = rows[i];
+    if (!name || !phone) continue;
+    let guestCount = 1;
+    if (guestCountRaw !== undefined && !isNaN(Number(guestCountRaw)) && Number(guestCountRaw) > 0) {
+      guestCount = Number(guestCountRaw);
+    }
+    guests.push({ name: String(name).trim(), phone: String(phone).trim(), guestCount });
   }
   return guests;
 }
@@ -344,10 +352,10 @@ router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, uplo
 
     let guests = [];
     if (req.file.mimetype === 'text/csv' || req.file.mimetype === 'application/vnd.ms-excel') {
-    const csvText = req.file.buffer.toString('utf-8');
+      const csvText = req.file.buffer.toString('utf-8');
       guests = parseCSVData(csvText);
     } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-      guests = parseXLSXGuests(req.file.buffer);
+      guests = await parseXLSXGuests(req.file.buffer);
     }
 
     if (guests.length === 0) {

@@ -11,29 +11,33 @@ export default function IdleSessionHandler() {
 
   useEffect(() => {
     const resetTimer = () => {
-      if (idleTimeout.current) clearTimeout(idleTimeout.current);
+      if (idleTimeout.current) {
+        clearTimeout(idleTimeout.current);
+      }
       if (isUserLoggedIn()) {
         idleTimeout.current = setTimeout(() => {
           logoutUser();
           toast({
             title: "Session Expired",
             description: "You have been logged out due to inactivity.",
-            variant: "destructive"
+            variant: "destructive",
           });
           navigate("/login");
         }, IDLE_LIMIT);
       }
     };
     const events = [
-      "mousemove", "mousedown", "keydown", "touchstart", "scroll"
+      "mousemove", "mousedown", "keydown", "touchstart", "scroll",
     ];
     events.forEach((event) => window.addEventListener(event, resetTimer));
     resetTimer();
     return () => {
-      if (idleTimeout.current) clearTimeout(idleTimeout.current);
+      if (idleTimeout.current) {
+        clearTimeout(idleTimeout.current);
+      }
       events.forEach((event) => window.removeEventListener(event, resetTimer));
     };
   }, [navigate]);
 
   return null;
-} 
+}
