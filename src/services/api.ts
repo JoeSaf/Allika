@@ -1,4 +1,5 @@
 import { env } from "@/config/environment";
+import { getAuthToken } from "@/utils/auth";
 
 // Types
 interface ApiResponse<T = any> {
@@ -94,7 +95,7 @@ class ApiService {
     options: RequestInit = {},
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
-    const token = localStorage.getItem("alika_token");
+    const token = getAuthToken();
 
     const config: RequestInit = {
       headers: {
@@ -677,16 +678,4 @@ export type {
   MessageLog,
 };
 
-// Convenience exports for commonly used methods
-export const {
-  addGuest,
-  addGuestsBulk,
-  getGuests,
-  getEvent,
-  getEventAnalytics,
-  checkDuplicatePhones,
-  checkInGuestQr,
-  updateRsvpSettings,
-  createEvent,
-  sendInvites,
-} = apiService;
+

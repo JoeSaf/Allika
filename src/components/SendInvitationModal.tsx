@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { sendInvites, addGuest, addGuestsBulk, getGuests, checkDuplicatePhones } from "@/services/api";
+import { apiService } from "@/services/api";
 import ExcelJS from "exceljs";
 
 // Updated regex to be more flexible but still require proper format
@@ -102,7 +102,7 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
           const phoneNumbers = validGuests.map(g => g.phone).filter(Boolean);
           if (phoneNumbers.length > 0) {
             try {
-              const duplicateCheck = await checkDuplicatePhones(eventId, phoneNumbers);
+              const duplicateCheck = await apiService.checkDuplicatePhones(eventId, phoneNumbers);
               if (duplicateCheck.success && duplicateCheck.data.hasDuplicates) {
                 const duplicateList = duplicateCheck.data.duplicates.map(d =>
                   `${d.phone} (${d.existingGuest})`,
@@ -134,7 +134,7 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
     setSending(true);
     try {
       // Check for duplicate phone number first
-      const duplicateCheck = await checkDuplicatePhones(eventId, [formattedPhone]);
+      const duplicateCheck = await apiService.checkDuplicatePhones(eventId, [formattedPhone]);
       if (duplicateCheck.success && duplicateCheck.data.hasDuplicates) {
         const duplicate = duplicateCheck.data.duplicates[0];
         alert(`Phone number ${duplicate.phone} is already registered for guest: ${duplicate.existingGuest}`);
@@ -143,7 +143,7 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
       }
 
       // 1. Add guest
-      const addRes = await addGuest(eventId, {
+      const addRes = await apiService.addGuest(eventId, {
         name: singleName,
         phone: formattedPhone,
         guestCount: singleGuestCount,
@@ -154,7 +154,7 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
       }
 
       // 2. Send invitation
-      await sendInvites(eventId, {
+      await apiService.sendInvites(eventId, {
         messageType,
         guestIds: [addRes.data.guest.id],
       });
@@ -179,7 +179,7 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
       console.log("Adding guests in bulk:", bulkGuests);
 
       // 1. Add guests in bulk
-      const addRes = await addGuestsBulk(eventId, bulkGuests);
+      const addRes = await apiService.addGuestsBulk(eventId, bulkGuests);
       console.log("Add guests response:", addRes);
 
       if (!addRes.success || !addRes.data?.createdGuests) {
@@ -194,7 +194,7 @@ export default function SendInvitationModal({ open, onClose, eventId, template }
       }
 
       // 2. Send invites
-      const sendRes = await sendInvites(eventId, {
+      const sendRes = await apiService.sendInvites(eventId, {
         messageType,
         guestIds,
       });

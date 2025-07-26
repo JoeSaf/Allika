@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Heart, Gift, Sparkles, ArrowLeft } from "lucide-react";
-import { createEvent, updateRsvpSettings } from "@/services/api";
+import { apiService } from "@/services/api";
 
 import { isUserLoggedIn, requireLogin } from "@/utils/auth";
 
@@ -71,7 +71,7 @@ const FeaturedTemplates = () => {
         venue: "",
         additionalInfo: "",
       };
-      const res = await createEvent(eventPayload);
+      const res = await apiService.createEvent(eventPayload);
       if (!res || !res.data || !res.data.event) {
         throw new Error("Event creation failed");
       }

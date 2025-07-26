@@ -31,14 +31,7 @@ import {
   Cell,
 } from "recharts";
 import { useToast } from "@/hooks/use-toast";
-import {
-  getEvent,
-  getEventAnalytics,
-  getGuests,
-  addGuest,
-  addGuestsBulk,
-  sendInvites,
-} from "@/services/api";
+import { apiService } from "@/services/api";
 import SendInvitationModal from "@/components/SendInvitationModal";
 
 interface Guest {
@@ -90,9 +83,9 @@ const ViewAnalytics = () => {
       setLoading(true);
 
       const [eventRes, guestsRes, analyticsRes] = await Promise.all([
-        getEvent(eventId!),
-        getGuests(eventId!),
-        getEventAnalytics(eventId!),
+        apiService.getEvent(eventId!),
+        apiService.getGuests(eventId!),
+        apiService.getEventAnalytics(eventId!),
       ]);
 
       if (eventRes.success) {

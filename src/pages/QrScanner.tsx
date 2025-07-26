@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { QrCode, Camera, Users, CheckCircle, X, Search, AlertCircle, CameraOff, Scan, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { checkInGuestQr, getEvent, getGuests } from "@/services/api";
+import { apiService } from "@/services/api";
 import { isUserLoggedIn, getCurrentUser } from "@/utils/auth";
 import jsQR from "jsqr";
 
@@ -85,7 +85,7 @@ const QrScanner = () => {
       setLoading(true);
 
       // Get event data
-      const eventRes = await getEvent(eventId!);
+      const eventRes = await apiService.getEvent(eventId!);
       if (!eventRes.success) {
         setAccessDenied(true);
         return;
@@ -102,7 +102,7 @@ const QrScanner = () => {
       }
 
       // Get guests data
-      const guestsRes = await getGuests(eventId!);
+      const guestsRes = await apiService.getGuests(eventId!);
       if (guestsRes.success) {
         const guests = guestsRes.data.guests;
         const checkedIn = guests.filter((guest: Guest) => guest.checked_in);
@@ -229,7 +229,7 @@ const QrScanner = () => {
       }
 
       // Send check-in request to backend
-      const response = await checkInGuestQr(qrData);
+      const response = await apiService.checkInGuestQr(qrData);
 
       if (response.success) {
         toast({

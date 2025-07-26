@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { createEvent, updateRsvpSettings } from "@/services/api";
+import { apiService } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
@@ -132,20 +132,19 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
 
     try {
       // 1. Create event via backend
-      const eventPayload = cleanPayload({
+      const eventPayload = {
         title: formData.name.trim(),
         type: formData.type,
         date: formData.date ? new Date(formData.date).toISOString().slice(0, 10) : "",
-        venue: formData.venue || null,
-        reception: formData.reception || null,
-        theme: formData.theme || null,
-        rsvpContact: formData.rsvpContact || null,
-        additionalInfo: formData.description || null,
-        invitingFamily: formData.invitingFamily || null,
+        venue: formData.venue || undefined,
+        reception: formData.reception || undefined,
+        theme: formData.theme || undefined,
+        rsvpContact: formData.rsvpContact || undefined,
+        additionalInfo: formData.description || undefined,
+        invitingFamily: formData.invitingFamily || undefined,
         ...(formData.receptionTime ? { receptionTime: formData.receptionTime.slice(0, 5) } : {}),
-        dateLang: dateLang,
-      });
-      const res = await createEvent(eventPayload);
+      };
+      const res = await apiService.createEvent(eventPayload);
       if (!res || !res.data || !res.data.event) {
         throw new Error("Event creation failed");
       }
