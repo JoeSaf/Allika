@@ -187,7 +187,7 @@ Ujumbe huu, umetumwa kwa kupitia Alika`;
   };
 
   const goBackToEditor = () => {
-    navigate(`/template/${currentEvent.id}`);
+    navigate(`/event/${currentEvent.id}`);
   };
 
   // Get the invitation image from either invitationData or main event

@@ -19,18 +19,14 @@ import { toast } from "@/hooks/use-toast";
 import { apiService } from "@/services/api";
 import Footer from "@/components/Footer";
 
-interface Event {
-  id: string;
-  title: string;
-  type: string;
-  date: string;
-  time: string;
-  venue: string;
-  status: string;
+// Import Event type from API service and extend it with backend properties
+import type { Event as ApiEvent } from "@/services/api";
+
+type Event = ApiEvent & {
   guest_count: number;
   checked_in_count: number;
   created_at: string;
-}
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -86,7 +82,7 @@ const Dashboard = () => {
       const response = await apiService.getEvents();
       if (response.success && response.data?.events) {
         console.log("Loaded events:", response.data.events);
-        setEvents(response.data.events);
+        setEvents(response.data.events as Event[]);
       } else {
         console.log("No events found or API error");
         setEvents([]);
@@ -145,15 +141,15 @@ const Dashboard = () => {
         const parsedData = JSON.parse(pendingEventData);
         if (parsedData.eventId === id) {
           console.log("[Dashboard] Found pending event data for event:", id);
-          // Keep the pending data for template editor to use
-          console.log("[Dashboard] Preserving pending event data for template editor");
+          // Keep the pending data for event editor to use
+          console.log("[Dashboard] Preserving pending event data for event editor");
         }
       }
 
-      console.log("[Dashboard] Navigating to template editor with event ID:", id);
-      navigate(`/template/${id}`);
+      console.log("[Dashboard] Navigating to event editor with event ID:", id);
+      navigate(`/event/${id}`);
     } catch (error) {
-      console.error("Error navigating to template editor:", error);
+      console.error("Error navigating to event editor:", error);
       toast({
         title: "Error",
         description: "There was a problem opening the event editor.",
@@ -189,7 +185,7 @@ const Dashboard = () => {
 
   const handleModalClose = () => {
     setShowCreateModal(false);
-    // Only reload events, do not navigate to template editor here
+    // Only reload events, do not navigate to event editor here
     loadEvents();
   };
 
@@ -337,7 +333,7 @@ const Dashboard = () => {
                         <span className="text-slate-400">Guests:</span>
                         <div className="flex items-center text-white">
                           <Users className="w-4 h-4 mr-1" />
-                          {event.guests?.length || 0}
+                          {event.guest_count || 0}
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-sm">

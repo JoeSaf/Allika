@@ -64,11 +64,12 @@ const Templates = () => {
     }
     try {
       // 1. Create event via backend
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       const eventPayload = {
         title: `New ${template.name}`,
         type: template.type,
-        date: "",
-        time: "",
+        date: today,
+        time: "12:00",
         venue: "",
         additionalInfo: "",
       };
@@ -76,15 +77,9 @@ const Templates = () => {
       if (!res || !res.data || !res.data.event) {
         throw new Error("Event creation failed");
       }
-      const newEvent = res.data.event;
-      // Note: RSVP settings are already created by the backend with appropriate defaults
-      // Users can customize them later in the template editor if needed
-      // Store the current event ID in localStorage for the template editor
-      localStorage.setItem("alika_current_event", newEvent.id);
-      console.log("[Templates] Navigating to template editor with event ID:", newEvent.id);
-      navigate(`/template/${newEvent.id}`);
+      // Redirect to dashboard so the user sees the new event
+      navigate("/dashboard");
     } catch (error) {
-      console.error("Error creating event:", error);
       // Optionally show a toast or error message
     }
   };

@@ -9,6 +9,7 @@ import { Sparkles, Eye, EyeOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { loginUser, registerUser } from "@/utils/auth";
 import Footer from "@/components/Footer";
+import Header from "@/components/Header";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -170,8 +171,10 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col">
+      <Header />
+      <div className="mt-14" />
       <div className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md bg-slate-800 border-slate-700">
+        <Card className="w-full max-w-md bg-slate-800 border-slate-700 mt-11">
           <CardHeader className="text-center">
             <div className="flex items-center justify-center mb-4">
               <Sparkles className="w-8 h-8 text-teal-400 mr-2" />

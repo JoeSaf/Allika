@@ -152,7 +152,7 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
 
       console.log("Event created successfully:", { eventId: newEvent.id, title: newEvent.title });
 
-      // Store event data in localStorage for template editor to use
+      // Store event data in localStorage for event editor to use
       localStorage.setItem("alika_pending_event_data", JSON.stringify({
         eventId: newEvent.id,
         eventDetails: {

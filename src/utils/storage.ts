@@ -153,7 +153,7 @@ export const saveEvent = (event: Event): void => {
   }
 };
 
-// New function to save event details from template editor
+// New function to save event details from event editor
 export const saveEventDetails = (eventId: string, details: Partial<Event>): void => {
   try {
     const events = getEvents();

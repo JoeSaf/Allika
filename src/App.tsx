@@ -8,7 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Templates from "./pages/Templates";
-import TemplateEditor from "./pages/TemplateEditor";
+import EventEditor from "./pages/EventEditor";
 import MessagePreview from "./pages/MessagePreview";
 import Pricing from "./pages/Pricing";
 import ViewAnalytics from "./pages/ViewAnalytics";
@@ -43,7 +43,7 @@ const App = (): JSX.Element => {
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/templates" element={<Templates />} />
-            <Route path="/template/:id" element={<TemplateEditor />} />
+            <Route path="/event/:id" element={<EventEditor />} />
             <Route path="/preview-message" element={<MessagePreview />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/analytics/:eventId" element={<ViewAnalytics />} />

@@ -77,11 +77,11 @@ const FeaturedTemplates = () => {
       }
       const newEvent = res.data.event;
       // Note: RSVP settings are already created by the backend with appropriate defaults
-      // Users can customize them later in the template editor if needed
-      // Store the current event ID in localStorage for the template editor
+      // Users can customize them later in the event editor if needed
+      // Store the current event ID in localStorage for the event editor
       localStorage.setItem("alika_current_event", newEvent.id);
-      console.log("[FeaturedTemplates] Navigating to template editor with event ID:", newEvent.id);
-      navigate(`/template/${newEvent.id}?template=${template.id}`);
+      console.log("[FeaturedTemplates] Navigating to event editor with event ID:", newEvent.id);
+      navigate(`/event/${newEvent.id}?template=${template.id}`);
     } catch (error) {
       console.error("Error creating event:", error);
       // Optionally show a toast or error message
