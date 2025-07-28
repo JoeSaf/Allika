@@ -33,14 +33,14 @@ export const connectDB = async () => {
     
     // Test the connection
     const connection = await pool.getConnection();
-    console.log('✅ Database connected successfully');
+    // console.log('✅ Database connected successfully');
     connection.release();
     
     // Create tables if they don't exist
     await createTables();
     
   } catch (error) {
-    console.error('❌ Database connection failed:', error);
+    // console.error('❌ Database connection failed:', error);
     process.exit(1);
   }
 };
@@ -103,28 +103,28 @@ const createTables = async () => {
     const [dateLangCol] = await connection.execute(`SHOW COLUMNS FROM events LIKE 'date_lang'`);
     if (dateLangCol.length === 0) {
       await connection.execute(`ALTER TABLE events ADD COLUMN date_lang VARCHAR(10) DEFAULT 'en'`);
-      console.log('✅ Added date_lang column to events table');
+      // console.log('✅ Added date_lang column to events table');
     }
 
     // Ensure messages_sent column exists (for legacy DBs)
     const [columns] = await connection.execute(`SHOW COLUMNS FROM events LIKE 'messages_sent'`);
     if (columns.length === 0) {
       await connection.execute(`ALTER TABLE events ADD COLUMN messages_sent INT DEFAULT 0`);
-      console.log('✅ Added messages_sent column to events table');
+      // console.log('✅ Added messages_sent column to events table');
     }
 
     // Ensure rsvp_contact_secondary column exists (for legacy DBs)
     const [rsvpSecondaryCol] = await connection.execute(`SHOW COLUMNS FROM events LIKE 'rsvp_contact_secondary'`);
     if (rsvpSecondaryCol.length === 0) {
       await connection.execute(`ALTER TABLE events ADD COLUMN rsvp_contact_secondary VARCHAR(20)`);
-      console.log('✅ Added rsvp_contact_secondary column to events table');
+      // console.log('✅ Added rsvp_contact_secondary column to events table');
     }
 
     // Update rsvp_contact field size to VARCHAR(20) for phone numbers (for legacy DBs)
     const [rsvpContactCol] = await connection.execute(`SHOW COLUMNS FROM events LIKE 'rsvp_contact'`);
     if (rsvpContactCol.length > 0 && rsvpContactCol[0].Type.toLowerCase() !== 'varchar(20)') {
       await connection.execute(`ALTER TABLE events MODIFY rsvp_contact VARCHAR(20)`);
-      console.log('✅ Updated rsvp_contact column to VARCHAR(20) in events table');
+      // console.log('✅ Updated rsvp_contact column to VARCHAR(20) in events table');
     }
 
     // Event invitation data table
@@ -157,47 +157,47 @@ const createTables = async () => {
     const [dateWordsCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'event_date_words'`);
     if (dateWordsCol.length === 0) {
       await connection.execute(`ALTER TABLE event_invitation_data ADD COLUMN event_date_words VARCHAR(255)`);
-      console.log('✅ Added event_date_words column to event_invitation_data table');
+      // console.log('✅ Added event_date_words column to event_invitation_data table');
     }
     // Ensure invitation_image column is MEDIUMTEXT (for legacy DBs)
     const [imgCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'invitation_image'`);
     if (imgCol.length > 0 && imgCol[0].Type.toLowerCase() !== 'mediumtext') {
       await connection.execute(`ALTER TABLE event_invitation_data MODIFY invitation_image MEDIUMTEXT`);
-      console.log('✅ Modified invitation_image column to MEDIUMTEXT in event_invitation_data table');
+      // console.log('✅ Modified invitation_image column to MEDIUMTEXT in event_invitation_data table');
     }
     // Ensure selected_template column exists (for legacy DBs)
     const [selTemplateCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'selected_template'`);
     if (selTemplateCol.length === 0) {
       await connection.execute(`ALTER TABLE event_invitation_data ADD COLUMN selected_template VARCHAR(50) DEFAULT 'template1'`);
-      console.log('✅ Added selected_template column to event_invitation_data table');
+      // console.log('✅ Added selected_template column to event_invitation_data table');
     }
 
     // Ensure rsvp_contact_secondary column exists (for legacy DBs)
     const [invRsvpSecondaryCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'rsvp_contact_secondary'`);
     if (invRsvpSecondaryCol.length === 0) {
       await connection.execute(`ALTER TABLE event_invitation_data ADD COLUMN rsvp_contact_secondary VARCHAR(20)`);
-      console.log('✅ Added rsvp_contact_secondary column to event_invitation_data table');
+      // console.log('✅ Added rsvp_contact_secondary column to event_invitation_data table');
     }
 
     // Update rsvp_contact field size to VARCHAR(20) for phone numbers (for legacy DBs)
     const [invRsvpContactCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'rsvp_contact'`);
     if (invRsvpContactCol.length > 0 && invRsvpContactCol[0].Type.toLowerCase() !== 'varchar(20)') {
       await connection.execute(`ALTER TABLE event_invitation_data MODIFY rsvp_contact VARCHAR(20)`);
-      console.log('✅ Updated rsvp_contact column to VARCHAR(20) in event_invitation_data table');
+      // console.log('✅ Updated rsvp_contact column to VARCHAR(20) in event_invitation_data table');
     }
 
     // Update reception_time to TIME type (for legacy DBs)
     const [receptionTimeCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'reception_time'`);
     if (receptionTimeCol.length > 0 && receptionTimeCol[0].Type.toLowerCase() !== 'time') {
       await connection.execute(`ALTER TABLE event_invitation_data MODIFY reception_time TIME`);
-      console.log('✅ Updated reception_time column to TIME in event_invitation_data table');
+      // console.log('✅ Updated reception_time column to TIME in event_invitation_data table');
     }
 
     // Ensure date_lang column exists (for legacy DBs)
     const [invDateLangCol] = await connection.execute(`SHOW COLUMNS FROM event_invitation_data LIKE 'date_lang'`);
     if (invDateLangCol.length === 0) {
       await connection.execute(`ALTER TABLE event_invitation_data ADD COLUMN date_lang VARCHAR(10) DEFAULT 'en'`);
-      console.log('✅ Added date_lang column to event_invitation_data table');
+      // console.log('✅ Added date_lang column to event_invitation_data table');
     }
 
     // RSVP settings table
@@ -237,14 +237,14 @@ const createTables = async () => {
     const [rsvpSettingsSecondaryCol] = await connection.execute(`SHOW COLUMNS FROM rsvp_settings LIKE 'rsvp_contact_secondary'`);
     if (rsvpSettingsSecondaryCol.length === 0) {
       await connection.execute(`ALTER TABLE rsvp_settings ADD COLUMN rsvp_contact_secondary VARCHAR(20)`);
-      console.log('✅ Added rsvp_contact_secondary column to rsvp_settings table');
+      // console.log('✅ Added rsvp_contact_secondary column to rsvp_settings table');
     }
 
     // Update rsvp_contact field size to VARCHAR(20) for phone numbers in rsvp_settings (for legacy DBs)
     const [rsvpSettingsContactCol] = await connection.execute(`SHOW COLUMNS FROM rsvp_settings LIKE 'rsvp_contact'`);
     if (rsvpSettingsContactCol.length > 0 && rsvpSettingsContactCol[0].Type.toLowerCase() !== 'varchar(20)') {
       await connection.execute(`ALTER TABLE rsvp_settings MODIFY rsvp_contact VARCHAR(20)`);
-      console.log('✅ Updated rsvp_contact column to VARCHAR(20) in rsvp_settings table');
+      // console.log('✅ Updated rsvp_contact column to VARCHAR(20) in rsvp_settings table');
     }
 
     // Guests table
@@ -279,7 +279,7 @@ const createTables = async () => {
     const [rsvpAliasCol] = await connection.execute(`SHOW COLUMNS FROM guests LIKE 'rsvp_alias'`);
     if (rsvpAliasCol.length === 0) {
       await connection.execute(`ALTER TABLE guests ADD COLUMN rsvp_alias VARCHAR(255) UNIQUE`);
-      console.log('✅ Added rsvp_alias column to guests table');
+      // console.log('✅ Added rsvp_alias column to guests table');
     }
 
     // RSVP responses table
@@ -321,7 +321,7 @@ const createTables = async () => {
       )
     `);
   } catch (error) {
-    console.error('❌ Error creating tables:', error);
+    // console.error('❌ Error creating tables:', error);
     process.exit(1);
   }
 };

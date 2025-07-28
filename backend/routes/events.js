@@ -1,10 +1,35 @@
 import express from 'express';
+import multer from 'multer';
 import { getPool } from '../config/database.js';
 import { authenticateToken, requireEventOwnership } from '../middleware/auth.js';
-import { validateCreateEvent, validateUpdateEvent, validateUUID, validatePagination } from '../middleware/validation.js';
-import { generateId, getPaginationInfo } from '../utils/helpers.js';
+import { validateCreateEvent, validateUpdateEvent, validateUUID, validateEventId, validatePagination } from '../middleware/validation.js';
+import { generateId, validateImageUpload, checkUploadRateLimit, generateSecureFilename, buildSecureUpdateQuery } from '../utils/helpers.js';
+import { getPaginationInfo } from '../utils/helpers.js';
 
 const router = express.Router();
+
+// Configure multer for image uploads with enhanced security
+const storage = multer.memoryStorage();
+const imageUpload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit for images
+  },
+  fileFilter: (req, file, cb) => {
+    // Basic MIME type check (will be validated further in the route)
+    const allowedMimeTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif'
+    ];
+    
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files (JPEG, PNG, GIF) are allowed'), false);
+    }
+  }
+});
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
@@ -56,14 +81,14 @@ router.post('/', validateCreateEvent, async (req, res) => {
     );
 
     if (!events.length) {
-      console.error('Event insert failed, event not found:', eventId);
+      // console.error('Event insert failed, event not found:', eventId);
       return res.status(500).json({
         error: true,
         message: 'Event creation failed (not found after insert)'
       });
     }
 
-    console.log('Event created successfully:', { eventId, userId, title });
+    // console.log('Event created successfully:', { eventId, userId, title });
 
     // Create default RSVP settings based on event type
     const rsvpSettingsId = generateId();
@@ -151,7 +176,7 @@ router.post('/', validateCreateEvent, async (req, res) => {
     // Commit the transaction
     await connection.commit();
     
-    console.log('Event transaction committed successfully:', { eventId, userId, title });
+    // console.log('Event transaction committed successfully:', { eventId, userId, title });
 
     res.status(201).json({
       success: true,
@@ -162,14 +187,14 @@ router.post('/', validateCreateEvent, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Create event error:', error);
+    // console.error('Create event error:', error);
     
     // Rollback transaction on error
     try {
       await connection.rollback();
-      console.log('Event creation transaction rolled back');
+      // console.log('Event creation transaction rolled back');
     } catch (rollbackError) {
-      console.error('Error rolling back transaction:', rollbackError);
+      // console.error('Error rolling back transaction:', rollbackError);
     }
     
     res.status(500).json({
@@ -235,7 +260,7 @@ router.get('/', validatePagination, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get events error:', error);
+    // console.error('Get events error:', error);
     res.status(500).json({
       error: true,
       message: 'Error fetching events'
@@ -299,7 +324,7 @@ router.get('/:id', validateUUID, requireEventOwnership, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get event error:', error);
+    // console.error('Get event error:', error);
     res.status(500).json({
       error: true,
       message: 'Error fetching event'
@@ -314,53 +339,52 @@ router.put('/:id', validateUUID, requireEventOwnership, validateUpdateEvent, asy
     const updateData = req.body;
     const pool = getPool();
 
-    // Build update query dynamically
-    const updateFields = [];
-    const updateValues = [];
-
+    // Define allowed fields for event updates
     const allowedFields = [
       'title', 'type', 'date', 'time', 'venue', 'reception', 'reception_time',
       'theme', 'rsvp_contact', 'rsvp_contact_secondary', 'additional_info', 'inviting_family', 'status'
     ];
 
-    allowedFields.forEach(field => {
-      if (updateData[field] !== undefined) {
-        updateFields.push(`${field} = ?`);
-        updateValues.push(updateData[field]);
-      }
-    });
+    try {
+      // Build secure update query
+      const updateQuery = buildSecureUpdateQuery(
+        'events',
+        allowedFields,
+        updateData,
+        'id = ?',
+        [id]
+      );
 
-    if (updateFields.length === 0) {
-      return res.status(400).json({
-        error: true,
-        message: 'No valid fields to update'
+      // Execute the update
+      await pool.execute(updateQuery.query, updateQuery.params);
+
+      // Get updated event
+      const [events] = await pool.execute(
+        'SELECT * FROM events WHERE id = ?',
+        [id]
+      );
+
+      res.json({
+        success: true,
+        message: 'Event updated successfully',
+        data: {
+          event: events[0],
+          updatedFields: updateQuery.updateFields
+        }
       });
+
+    } catch (updateError) {
+      if (updateError.message === 'No valid fields to update') {
+        return res.status(400).json({
+          error: true,
+          message: updateError.message
+        });
+      }
+      throw updateError;
     }
 
-    updateValues.push(id);
-
-    // Update event
-    await pool.execute(
-      `UPDATE events SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      updateValues
-    );
-
-    // Get updated event
-    const [events] = await pool.execute(
-      'SELECT * FROM events WHERE id = ?',
-      [id]
-    );
-
-    res.json({
-      success: true,
-      message: 'Event updated successfully',
-      data: {
-        event: events[0]
-      }
-    });
-
   } catch (error) {
-    console.error('Update event error:', error);
+    // console.error('Update event error:', error);
     res.status(500).json({
       error: true,
       message: 'Error updating event'
@@ -396,7 +420,7 @@ router.delete('/:id', validateUUID, requireEventOwnership, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete event error:', error);
+    // console.error('Delete event error:', error);
     res.status(500).json({
       error: true,
       message: 'Error deleting event'
@@ -461,7 +485,7 @@ router.post('/:id/invitation-data', validateUUID, requireEventOwnership, async (
     });
 
   } catch (error) {
-    console.error('Update invitation data error:', error);
+    // console.error('Update invitation data error:', error);
     res.status(500).json({
       error: true,
       message: 'Error updating invitation data'
@@ -476,7 +500,7 @@ router.post('/:id/rsvp-settings', validateUUID, requireEventOwnership, async (re
     const rsvpSettings = req.body;
     const pool = getPool();
 
-    console.log('RSVP update for eventId:', id, 'userId:', req.user.id);
+    // console.log('RSVP update for eventId:', id, 'userId:', req.user.id);
 
     // Check if RSVP settings already exist
     const [existing] = await pool.execute(
@@ -507,7 +531,7 @@ router.post('/:id/rsvp-settings', validateUUID, requireEventOwnership, async (re
           rsvpSettings.buttonColor || null, rsvpSettings.accentColor || null, rsvpSettings.rsvpContact || null, rsvpSettings.rsvpContactSecondary || null, id
         ]
       );
-      console.log('RSVP settings updated for eventId:', id);
+      // console.log('RSVP settings updated for eventId:', id);
     } else {
       // Create new
       const rsvpId = generateId();
@@ -531,7 +555,7 @@ router.post('/:id/rsvp-settings', validateUUID, requireEventOwnership, async (re
           rsvpSettings.buttonColor || null, rsvpSettings.accentColor || null, rsvpSettings.rsvpContact || null
         ]
       );
-      console.log('RSVP settings created for eventId:', id);
+      // console.log('RSVP settings created for eventId:', id);
     }
 
     res.json({
@@ -540,10 +564,147 @@ router.post('/:id/rsvp-settings', validateUUID, requireEventOwnership, async (re
     });
 
   } catch (error) {
-    console.error('Update RSVP settings error:', error);
+    // console.error('Update RSVP settings error:', error);
     res.status(500).json({
       error: true,
       message: 'Error updating RSVP settings'
+    });
+  }
+});
+
+// POST /api/events/:id/upload-image - Upload invitation image with enhanced security
+router.post('/:id/upload-image', validateUUID, requireEventOwnership, imageUpload.single('image'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    
+    // Rate limiting check
+    try {
+      checkUploadRateLimit(userId);
+    } catch (rateLimitError) {
+      return res.status(429).json({
+        error: true,
+        message: rateLimitError.message
+      });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({
+        error: true,
+        message: 'No image file uploaded'
+      });
+    }
+
+    // Enhanced security validation
+    let validationResult;
+    try {
+      validationResult = validateImageUpload(req.file);
+    } catch (validationError) {
+      return res.status(400).json({
+        error: true,
+        message: validationError.message
+      });
+    }
+
+    // Log upload attempt for security monitoring
+    // console.log(`Image upload attempt: User ${userId}, Event ${id}, File: ${validationResult.secureFilename}, Size: ${validationResult.fileSize} bytes`);
+
+    const pool = getPool();
+    
+    // Convert image to base64 for storage
+    const base64Image = `data:${validationResult.detectedType};base64,${req.file.buffer.toString('base64')}`;
+    
+    // Update event invitation data with the new image
+    const [existingInvitation] = await pool.execute(
+      'SELECT id FROM event_invitation_data WHERE event_id = ?',
+      [id]
+    );
+
+    if (existingInvitation.length > 0) {
+      // Update existing invitation data
+      await pool.execute(
+        `UPDATE event_invitation_data SET 
+         invitation_image = ?, 
+         updated_at = CURRENT_TIMESTAMP 
+         WHERE event_id = ?`,
+        [base64Image, id]
+      );
+    } else {
+      // Create new invitation data
+      const invitationId = generateId();
+      await pool.execute(
+        `INSERT INTO event_invitation_data (
+          id, event_id, invitation_image, selected_template
+        ) VALUES (?, ?, ?, ?)`,
+        [invitationId, id, base64Image, 'template1']
+      );
+    }
+
+    // Log successful upload
+    // console.log(`Image upload completed: User ${userId}, Event ${id}, File: ${validationResult.secureFilename}`);
+
+    res.json({
+      success: true,
+      message: 'Invitation image uploaded successfully',
+      data: {
+        filename: validationResult.secureFilename,
+        size: validationResult.fileSize,
+        type: validationResult.detectedType
+      }
+    });
+
+  } catch (error) {
+    // console.error('Image upload error:', error);
+    res.status(500).json({
+      error: true,
+      message: 'Error uploading image'
+    });
+  }
+});
+
+// GET /api/events/security-status - Get security monitoring data
+router.get('/security-status', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // This would typically connect to a security monitoring service
+    // For now, we'll return basic security status
+    const securityStatus = {
+      userId,
+      timestamp: new Date().toISOString(),
+      uploadRateLimit: {
+        enabled: true,
+        windowMs: 15 * 60 * 1000, // 15 minutes
+        maxAttempts: 10
+      },
+      fileValidation: {
+        enabled: true,
+        signatureValidation: true,
+        malwareScanning: true,
+        sizeLimits: {
+          images: '5MB',
+          documents: '10MB'
+        }
+      },
+      allowedFileTypes: {
+        images: ['image/jpeg', 'image/png', 'image/gif'],
+        documents: [
+          'text/csv',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ]
+      }
+    };
+
+    res.json({
+      success: true,
+      data: securityStatus
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      error: true,
+      message: 'Error fetching security status'
     });
   }
 });

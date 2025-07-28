@@ -1,10 +1,11 @@
 import express from 'express';
 import { getPool } from '../config/database.js';
 import { optionalAuth } from '../middleware/auth.js';
-import { validateRSVPResponse } from '../middleware/validation.js';
+import { validateRSVPResponse, validateUUID, validateEventId } from '../middleware/validation.js';
 import { formatDateTime } from '../utils/helpers.js';
 import { v4 as uuidv4 } from 'uuid';
 import puppeteer from 'puppeteer';
+import { generateId, generateRSVPToken, generateGuestQRCode, parseCSVData, formatPhoneNumber, generateRSVPAlias, cacheInvitationImage, getCachedInvitationImage, generateInvitationCacheKey, cleanupImageCache, trackImageGeneration, getImageGenerationMetrics } from '../utils/helpers.js';
 
 const router = express.Router();
 
@@ -349,9 +350,23 @@ router.get('/:token/status', async (req, res) => {
 });
 
 router.get('/invitation/:tokenOrAlias/image', async (req, res) => {
+  const startTime = Date.now();
+  let wasCached = false;
+  
   try {
     const { tokenOrAlias } = req.params;
     const pool = getPool();
+
+    // Check cache first
+    const cacheKey = generateInvitationCacheKey(tokenOrAlias);
+    const cachedImage = getCachedInvitationImage(cacheKey);
+    if (cachedImage) {
+      wasCached = true;
+      trackImageGeneration(startTime, true);
+      res.set('Content-Type', 'image/png');
+      res.set('X-Cache', 'HIT');
+      return res.send(cachedImage);
+    }
 
     // Try to find guest by alias first, then fallback to token
     let [guests] = await pool.execute(
@@ -375,21 +390,90 @@ router.get('/invitation/:tokenOrAlias/image', async (req, res) => {
     }
     const guest = guests[0];
 
-    // Minimal HTML template for the invitation card
+    // Optimized HTML template with better styling
     const html = `
       <html>
       <head>
         <meta charset='utf-8'>
         <style>
-          body { background: #1e293b; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 0; }
-          .card { background: #232f3e; border-radius: 16px; max-width: 400px; margin: 40px auto; padding: 32px; box-shadow: 0 4px 24px #0003; text-align: center; }
-          .title { font-size: 2rem; font-weight: bold; margin-bottom: 8px; }
-          .subtitle { color: #cbd5e1; font-size: 1.1rem; margin-bottom: 8px; }
-          .venue { color: #94a3b8; font-size: 1rem; margin-bottom: 16px; }
-          .dear { font-size: 1.2rem; font-weight: bold; margin-bottom: 8px; }
-          .admit { color: #14b8a6; font-size: 1.1rem; font-weight: bold; margin-bottom: 16px; }
-          .qr { margin: 24px 0; }
-          .footer { color: #94a3b8; font-size: 0.9rem; margin-top: 16px; }
+          body { 
+            background: #1e293b; 
+            color: #fff; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+          }
+          .card { 
+            background: linear-gradient(135deg, #232f3e 0%, #1e293b 100%);
+            border-radius: 20px; 
+            width: 400px; 
+            padding: 40px; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3); 
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+          }
+          .title { 
+            font-size: 2.2rem; 
+            font-weight: 700; 
+            margin-bottom: 12px;
+            background: linear-gradient(45deg, #14b8a6, #0d9488);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+          }
+          .subtitle { 
+            color: #cbd5e1; 
+            font-size: 1.2rem; 
+            margin-bottom: 12px;
+            font-weight: 500;
+          }
+          .venue { 
+            color: #94a3b8; 
+            font-size: 1.1rem; 
+            margin-bottom: 24px;
+            font-style: italic;
+          }
+          .dear { 
+            font-size: 1.3rem; 
+            font-weight: 600; 
+            margin-bottom: 12px;
+            color: #e2e8f0;
+          }
+          .admit { 
+            color: #14b8a6; 
+            font-size: 1.2rem; 
+            font-weight: 600; 
+            margin-bottom: 24px;
+            padding: 8px 16px;
+            background: rgba(20, 184, 166, 0.1);
+            border-radius: 8px;
+            display: inline-block;
+          }
+          .qr { 
+            margin: 32px 0;
+            padding: 16px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+          }
+          .qr img {
+            width: 160px; 
+            height: 160px; 
+            background: #fff; 
+            border-radius: 12px;
+            padding: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+          }
+          .footer { 
+            color: #94a3b8; 
+            font-size: 0.95rem; 
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+          }
         </style>
       </head>
       <body>
@@ -401,7 +485,7 @@ router.get('/invitation/:tokenOrAlias/image', async (req, res) => {
           <div>You are cordially invited to our event!</div>
           <div class='admit'>Admit: ${guest.guest_count === 1 ? 'Single' : guest.guest_count === 2 ? 'Double' : guest.guest_count === 3 ? 'Triple' : `${guest.guest_count} Guests`}</div>
           <div class='qr'>
-            <img src='data:image/png;base64,${guest.qr_code_data}' alt='QR Code' style='width: 160px; height: 160px; background: #fff; border-radius: 8px;' />
+            <img src='data:image/png;base64,${guest.qr_code_data}' alt='QR Code' />
           </div>
           <div class='footer'>RSVP: ${guest.rsvp_contact || ''}</div>
         </div>
@@ -409,18 +493,70 @@ router.get('/invitation/:tokenOrAlias/image', async (req, res) => {
       </html>
     `;
 
-    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    // Optimized Puppeteer configuration
+    const browser = await puppeteer.launch({ 
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor'
+      ],
+      headless: true
+    });
+    
     const page = await browser.newPage();
+    
+    // Set viewport for optimal rendering
+    await page.setViewport({ width: 800, height: 600, deviceScaleFactor: 2 });
+    
+    // Set content and wait for rendering
     await page.setContent(html, { waitUntil: 'networkidle0' });
+    
+    // Wait for the card to be fully rendered
+    await page.waitForFunction(() => {
+      const card = document.querySelector('.card');
+      return card && card.offsetHeight > 0;
+    }, { timeout: 10000 });
+    
+    // Screenshot the card
     const cardElement = await page.$('.card');
-    const imageBuffer = await cardElement.screenshot({ type: 'png' });
+    const imageBuffer = await cardElement.screenshot({ 
+      type: 'png',
+      omitBackground: false
+    });
+    
     await browser.close();
 
+    // Cache the generated image
+    cacheInvitationImage(cacheKey, imageBuffer);
+
+    trackImageGeneration(startTime, false);
     res.set('Content-Type', 'image/png');
+    res.set('X-Cache', 'MISS');
     res.send(imageBuffer);
+    
   } catch (error) {
-    console.error('Error generating invitation image:', error);
+    trackImageGeneration(startTime, false);
+    // console.error('Error generating invitation image:', error);
     res.status(500).json({ error: true, message: 'Error generating invitation image' });
+  }
+});
+
+// GET /api/rsvp/metrics - Get image generation metrics
+router.get('/metrics', async (req, res) => {
+  try {
+    const metrics = getImageGenerationMetrics();
+    res.json({
+      success: true,
+      data: metrics
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: true,
+      message: 'Error fetching metrics'
+    });
   }
 });
 

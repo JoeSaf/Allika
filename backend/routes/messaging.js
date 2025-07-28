@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { formatDateTime, formatTimeInWords, formatDateInWords } from '../utils/helpers.js';
+import { buildSecureInClause } from '../utils/helpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,19 +24,18 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
   try {
     const { eventId } = req.params;
     const { messageType, guestIds, customMessage } = req.body;
+    const userId = req.user.id;
+
+    // console.log('Send invites request:', { eventId, messageType, guestIds, customMessage });
+
     const pool = getPool();
 
-    console.log('Send invites request:', { eventId, messageType, guestIds, customMessage });
-
-    // Get event and invitation data
+    // Get event details
     const [events] = await pool.execute(
-      `SELECT e.*, eid.couple_name, eid.event_date, eid.event_date_words, eid.event_time, eid.venue,
-              eid.reception, eid.reception_time, eid.theme, eid.rsvp_contact, eid.rsvp_contact_secondary,
-              e.date_lang, eid.date_lang as invitation_date_lang
-       FROM events e
-       LEFT JOIN event_invitation_data eid ON e.id = eid.event_id
-       WHERE e.id = ?`,
-      [eventId]
+      `SELECT e.*, eid.* FROM events e 
+       LEFT JOIN event_invitation_data eid ON e.id = eid.event_id 
+       WHERE e.id = ? AND e.user_id = ?`,
+      [eventId, userId]
     );
 
     if (events.length === 0) {
@@ -47,39 +47,42 @@ router.post('/:eventId/send-invites', validateEventId, requireEventOwnership, va
 
     const event = events[0];
 
-    // Get guests to send invitations to
-    let guestQuery = 'SELECT * FROM guests WHERE event_id = ?';
+    // Build guest query
+    let guestQuery = `
+      SELECT id, name, phone, email, rsvp_token, rsvp_alias 
+      FROM guests 
+      WHERE event_id = ?
+    `;
     let guestParams = [eventId];
 
     if (guestIds && guestIds.length > 0) {
-      guestQuery += ' AND id IN (' + guestIds.map(() => '?').join(',') + ')';
+      guestQuery += ` AND id IN (${guestIds.map(() => '?').join(',')})`;
       guestParams.push(...guestIds);
     }
 
-    console.log('Guest query:', guestQuery);
-    console.log('Guest params:', guestParams);
+    // console.log('Guest query:', guestQuery);
+    // console.log('Guest params:', guestParams);
 
     const [guests] = await pool.execute(guestQuery, guestParams);
 
-    console.log('Found guests:', guests.length, guests.map(g => ({ id: g.id, name: g.name, phone: g.phone })));
+    // console.log('Found guests:', guests.length, guests.map(g => ({ id: g.id, name: g.name, phone: g.phone })));
 
     if (guests.length === 0) {
       return res.status(400).json({
         error: true,
-        message: 'No guests found to send invitations to'
+        message: 'No guests found to send messages to'
       });
     }
 
-    // Initialize mNotify client if credentials are available
+    // Initialize mNotify client if API key is available
     let mNotifyClient = null;
-    if (process.env.MNOTIFY_API_KEY) {
-      try {
-        mNotifyClient = require('mnotify-node');
+    try {
+      if (process.env.MNOTIFY_API_KEY) {
+        const { mNotifyClient: mNotify } = await import('mnotify-js');
         mNotifyClient = new mNotifyClient(process.env.MNOTIFY_API_KEY);
-      } catch (e) {
-        console.error('Failed to initialize mNotify:', e);
-        mNotifyClient = null;
       }
+    } catch (e) {
+      // console.error('Failed to initialize mNotify:', e);
     }
 
     const sentMessages = [];
@@ -402,23 +405,12 @@ router.get('/:eventId/summary', validateEventId, requireEventOwnership, async (r
 router.post('/:eventId/retry', validateEventId, requireEventOwnership, async (req, res) => {
   try {
     const { eventId } = req.params;
-    const { messageIds } = req.body;
     const pool = getPool();
 
-    if (!messageIds || !Array.isArray(messageIds)) {
-      return res.status(400).json({
-        error: true,
-        message: 'Message IDs array is required'
-      });
-    }
-
-    // Get failed messages
+    // Get failed messages for this event
     const [failedMessages] = await pool.execute(
-      `SELECT ml.*, g.name as guest_name, g.phone, g.email
-       FROM message_logs ml
-       LEFT JOIN guests g ON ml.guest_id = g.id
-       WHERE ml.event_id = ? AND ml.id IN (${messageIds.map(() => '?').join(',')}) AND ml.status = 'failed'`,
-      [eventId, ...messageIds]
+      'SELECT id FROM message_logs WHERE event_id = ? AND status = "failed"',
+      [eventId]
     );
 
     if (failedMessages.length === 0) {
@@ -428,11 +420,15 @@ router.post('/:eventId/retry', validateEventId, requireEventOwnership, async (re
       });
     }
 
-    // TODO: Implement retry logic
-    // For now, just update status to pending
+    const messageIds = failedMessages.map(msg => msg.id);
+
+    // Build secure IN clause for the update
+    const inClause = buildSecureInClause(messageIds, 'id');
+    
+    // Update failed messages to pending status
     await pool.execute(
-      `UPDATE message_logs SET status = 'pending', error_message = NULL WHERE id IN (${messageIds.map(() => '?').join(',')})`,
-      messageIds
+      `UPDATE message_logs SET status = 'pending', error_message = NULL WHERE ${inClause.query}`,
+      inClause.params
     );
 
     res.json({
@@ -454,7 +450,7 @@ router.post('/:eventId/retry', validateEventId, requireEventOwnership, async (re
 
 // Utility function to send SMS via Notify Africa
 async function sendNotifyAfricaSMS({ phone, name, rsvpLink, message }) {
-  const token = '1032|QWOWLGEXr3yZtYq8RHkOWKblDk1IQ8jzCMFdcHj9fabfdb57';
+  const token = process.env.NOTIFY_AFRICA_TOKEN || '1032|QWOWLGEXr3yZtYq8RHkOWKblDk1IQ8jzCMFdcHj9fabfdb57';
   const baseUrl = 'https://api.notify.africa/v2';
   const url = `${baseUrl}/send-sms`;
   const smsText = message || `Hello ${name}, you are invited! RSVP: ${rsvpLink}`;
@@ -497,21 +493,21 @@ function generateMessageContent(event, guest, messageType, customMessage) {
   const language = eventData.invitation_date_lang || eventData.date_lang || eventData.dateLang || 'en';
   
   // Debug logging
-  console.log('generateMessageContent debug:', {
-    eventData: {
-      couple_name: eventData.couple_name,
-      event_date: eventData.event_date,
-      event_date_words: eventData.event_date_words,
-      event_time: eventData.event_time,
-      time: eventData.time,
-      venue: eventData.venue,
-      date_lang: eventData.date_lang,
-      invitation_date_lang: eventData.invitation_date_lang,
-      dateLang: eventData.dateLang
-    },
-    language,
-    guestName
-  });
+  // console.log('generateMessageContent debug:', {
+  //   eventData: {
+  //     couple_name: eventData.couple_name,
+  //     event_date: eventData.event_date,
+  //     event_date_words: eventData.event_date_words,
+  //     event_time: eventData.event_time,
+  //     time: eventData.time,
+  //     venue: eventData.venue,
+  //     date_lang: eventData.date_lang,
+  //     invitation_date_lang: eventData.invitation_date_lang,
+  //     dateLang: eventData.dateLang
+  //   },
+  //   language,
+  //   guestName
+  // });
   
   // Format time in words
   const eventTimeInWords = formatTimeInWords(eventData.event_time || eventData.time, language);
@@ -520,11 +516,11 @@ function generateMessageContent(event, guest, messageType, customMessage) {
   // Format date in words - prefer event_date_words if available, otherwise format the date
   const eventDateInWords = eventData.event_date_words || formatDateInWords(eventData.event_date || eventData.date, language);
   
-  console.log('Formatted values:', {
-    eventTimeInWords,
-    eventDateInWords,
-    language
-  });
+  // console.log('Formatted values:', {
+  //   eventTimeInWords,
+  //   eventDateInWords,
+  //   language
+  // });
   
   // Use alias if available, fallback to token
   const rsvpPath = guest.rsvp_alias ? `/rsvp/${guest.rsvp_alias}` : `/rsvp/${guest.rsvp_token}`;

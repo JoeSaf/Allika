@@ -46,7 +46,7 @@ export const authenticateToken = async (req, res, next) => {
       });
     }
 
-    console.error('Auth middleware error:', error);
+    // console.error('Auth middleware error:', error);
     return res.status(500).json({
       error: true,
       message: 'Authentication error'
@@ -98,7 +98,7 @@ export const requireEventOwnership = async (req, res, next) => {
     }
     const userId = req.user.id;
 
-    console.log('Checking event ownership:', { eventId, userId });
+    // console.log('Checking event ownership:', { eventId, userId });
 
     const pool = getPool();
     // Allow owner to access their event regardless of status
@@ -108,17 +108,17 @@ export const requireEventOwnership = async (req, res, next) => {
     );
 
     if (events.length === 0) {
-      console.log('Event ownership check failed:', { eventId, userId });
+      // console.log('Event ownership check failed:', { eventId, userId });
       return res.status(403).json({
         error: true,
         message: 'Access denied. You do not own this event.'
       });
     }
 
-    console.log('Event ownership check passed:', { eventId, userId });
+    // console.log('Event ownership check passed:', { eventId, userId });
     next();
   } catch (error) {
-    console.error('Event ownership check error:', error);
+    // console.error('Event ownership check error:', error);
     return res.status(500).json({
       error: true,
       message: 'Error checking event ownership'
@@ -159,7 +159,7 @@ export const requireEventAccess = async (req, res, next) => {
       message: 'Access denied. You do not have permission to access this event.'
     });
   } catch (error) {
-    console.error('Event access check error:', error);
+    // console.error('Event access check error:', error);
     return res.status(500).json({
       error: true,
       message: 'Error checking event access'

@@ -54,7 +54,7 @@ router.post('/register', validateRegister, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
+    // console.error('Registration error:', error);
     res.status(500).json({
       error: true,
       message: 'Error creating user account'
@@ -108,7 +108,7 @@ router.post('/login', validateLogin, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    // console.error('Login error:', error);
     res.status(500).json({
       error: true,
       message: 'Error during login'
@@ -167,7 +167,7 @@ router.get('/me', async (req, res) => {
       });
     }
 
-    console.error('Auth me error:', error);
+    // console.error('Auth me error:', error);
     res.status(500).json({
       error: true,
       message: 'Error fetching user data'
@@ -260,7 +260,7 @@ router.post('/change-password', async (req, res) => {
       });
     }
 
-    console.error('Change password error:', error);
+    // console.error('Change password error:', error);
     res.status(500).json({
       error: true,
       message: 'Error changing password'
@@ -302,7 +302,7 @@ router.post('/forgot-password', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Forgot password error:', error);
+    // console.error('Forgot password error:', error);
     res.status(500).json({
       error: true,
       message: 'Error processing password reset request'

@@ -1,6 +1,6 @@
-# Allika Backend API
+# Alika Backend API
 
-Backend API server for the Allika Event Invitation Platform. Built with Node.js, Express, and MySQL.
+Backend API server for the Alika Event Invitation Platform. Built with Node.js, Express, and MySQL.
 
 ## 🚀 Quick Start
 
@@ -24,7 +24,7 @@ cp env.example .env
 ```bash
 # Create database
 mysql -u root -p
-CREATE DATABASE allika_db;
+CREATE DATABASE alika_db;
 exit;
 
 # Run migrations and seed data
@@ -133,7 +133,7 @@ NODE_ENV=development
 # Database
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=allika_db
+DB_NAME=alika_db
 DB_USER=root
 DB_PASSWORD=
 
@@ -151,7 +151,7 @@ SMTP_PASS=your-app-password
 WHATSAPP_API_KEY=your-whatsapp-api-key
 WHATSAPP_PHONE_NUMBER=your-whatsapp-number
 SMS_API_KEY=your-sms-api-key
-SMS_SENDER_ID=ALLIKA
+SMS_SENDER_ID=ALIKA
 
 # File Upload
 MAX_FILE_SIZE=5242880

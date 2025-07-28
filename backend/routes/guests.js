@@ -4,26 +4,30 @@ import ExcelJS from 'exceljs';
 import { getPool } from '../config/database.js';
 import { authenticateToken, requireEventOwnership } from '../middleware/auth.js';
 import { validateCreateGuest, validateBulkGuestUpload, validateUUID, validateEventId } from '../middleware/validation.js';
-import { generateId, generateRSVPToken, generateGuestQRCode, parseCSVData, formatPhoneNumber, generateRSVPAlias } from '../utils/helpers.js';
+import { generateId, generateRSVPToken, generateGuestQRCode, parseCSVData, formatPhoneNumber, generateRSVPAlias, validateDocumentUpload, checkUploadRateLimit, generateSecureFilename, buildSecureUpdateQuery } from '../utils/helpers.js';
 
 const router = express.Router();
 
-// Configure multer for file uploads
+// Configure multer for file uploads with enhanced security
+// SECURITY: File type and size validation enforced below
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB limit for documents
   },
   fileFilter: (req, file, cb) => {
-    if (
-      file.mimetype === 'text/csv' ||
-      file.mimetype === 'application/vnd.ms-excel' ||
-      file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    ) {
+    // Basic MIME type check (will be validated further in the route)
+    const allowedMimeTypes = [
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    
+    if (allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only CSV or XLSX files are allowed'), false);
+      cb(new Error('Only CSV or Excel files are allowed'), false);
     }
   }
 });
@@ -119,7 +123,7 @@ router.post('/:eventId', validateEventId, requireEventOwnership, validateCreateG
     });
 
   } catch (error) {
-    console.error('Add guest error:', error);
+    // console.error('Add guest error:', error);
     res.status(500).json({
       error: true,
       message: 'Error adding guest'
@@ -154,7 +158,7 @@ router.post('/:eventId/check-duplicates', validateEventId, requireEventOwnership
     });
 
   } catch (error) {
-    console.error('Check duplicates error:', error);
+    // console.error('Check duplicates error:', error);
     res.status(500).json({
       error: true,
       message: 'Error checking for duplicates'
@@ -199,7 +203,7 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
     const { guests } = req.body;
     const pool = getPool();
 
-    console.log('Bulk guest creation request:', { eventId, guestCount: guests.length, guests });
+    // console.log('Bulk guest creation request:', { eventId, guestCount: guests.length, guests });
 
     // Check for duplicate phone numbers
     const phoneNumbers = guests.map(g => g.phone).filter(Boolean);
@@ -239,11 +243,11 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
           if (aliasIndex > 10) { alias = `${baseAlias}-${guestId.slice(0, 6)}`; break; }
         }
 
-        console.log(`Processing guest ${i + 1}:`, { name: guest.name, phone: guest.phone });
+        // console.log(`Processing guest ${i + 1}:`, { name: guest.name, phone: guest.phone });
 
         // Format phone number if provided
         const formattedPhone = guest.phone ? formatPhoneNumber(guest.phone) : null;
-        console.log('Formatted phone:', formattedPhone);
+        // console.log('Formatted phone:', formattedPhone);
 
         // Create guest
         await pool.execute(
@@ -265,7 +269,7 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
           ]
         );
 
-        console.log(`Guest ${i + 1} created with ID:`, guestId);
+        // console.log(`Guest ${i + 1} created with ID:`, guestId);
 
         // Generate QR code
         const qrCodeData = await generateGuestQRCode(guestId, eventId, rsvpToken);
@@ -283,10 +287,10 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
         );
 
         createdGuests.push(createdGuest[0]);
-        console.log(`Guest ${i + 1} successfully added to response`);
+        // console.log(`Guest ${i + 1} successfully added to response`);
 
       } catch (error) {
-        console.error(`Error creating guest ${i + 1}:`, error);
+        // console.error(`Error creating guest ${i + 1}:`, error);
         errors.push({
           index: i,
           guest: guests[i],
@@ -295,7 +299,7 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
       }
     }
 
-    console.log('Bulk creation completed:', { createdCount: createdGuests.length, errorCount: errors.length });
+    // console.log('Bulk creation completed:', { createdCount: createdGuests.length, errorCount: errors.length });
 
     res.status(201).json({
       success: true,
@@ -307,7 +311,7 @@ router.post('/:eventId/bulk', validateEventId, requireEventOwnership, validateBu
     });
 
   } catch (error) {
-    console.error('Bulk add guests error:', error);
+    // console.error('Bulk add guests error:', error);
     res.status(500).json({
       error: true,
       message: 'Error adding guests'
@@ -338,10 +342,21 @@ async function parseXLSXGuests(buffer) {
   return guests;
 }
 
-// POST /api/guests/:eventId/upload-csv - Upload CSV file
+// POST /api/guests/:eventId/upload-csv - Upload CSV file with enhanced security
 router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, upload.single('file'), async (req, res) => {
   try {
     const { eventId } = req.params;
+    const userId = req.user.id;
+    
+    // Rate limiting check
+    try {
+      checkUploadRateLimit(userId);
+    } catch (rateLimitError) {
+      return res.status(429).json({
+        error: true,
+        message: rateLimitError.message
+      });
+    }
     
     if (!req.file) {
       return res.status(400).json({
@@ -350,12 +365,33 @@ router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, uplo
       });
     }
 
+    // Enhanced security validation
+    let validationResult;
+    try {
+      validationResult = validateDocumentUpload(req.file);
+    } catch (validationError) {
+      return res.status(400).json({
+        error: true,
+        message: validationError.message
+      });
+    }
+
+    // Log upload attempt for security monitoring
+    // console.log(`File upload attempt: User ${userId}, Event ${eventId}, File: ${validationResult.secureFilename}, Size: ${validationResult.fileSize} bytes`);
+
     let guests = [];
-    if (req.file.mimetype === 'text/csv' || req.file.mimetype === 'application/vnd.ms-excel') {
-      const csvText = req.file.buffer.toString('utf-8');
-      guests = parseCSVData(csvText);
-    } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-      guests = await parseXLSXGuests(req.file.buffer);
+    try {
+      if (req.file.mimetype === 'text/csv' || req.file.mimetype === 'application/vnd.ms-excel') {
+        const csvText = req.file.buffer.toString('utf-8');
+        guests = parseCSVData(csvText);
+      } else if (req.file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+        guests = await parseXLSXGuests(req.file.buffer);
+      }
+    } catch (parseError) {
+      return res.status(400).json({
+        error: true,
+        message: 'Failed to parse file content. Please ensure the file is not corrupted.'
+      });
     }
 
     if (guests.length === 0) {
@@ -365,8 +401,44 @@ router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, uplo
       });
     }
 
+    // Validate guest data before processing
+    const validGuests = [];
+    const invalidGuests = [];
+    
+    for (const guest of guests) {
+      if (!guest.name || guest.name.trim().length === 0) {
+        invalidGuests.push({ ...guest, error: 'Name is required' });
+        continue;
+      }
+      
+      if (guest.name.length > 255) {
+        invalidGuests.push({ ...guest, error: 'Name too long (max 255 characters)' });
+        continue;
+      }
+      
+      if (guest.email && !isValidEmail(guest.email)) {
+        invalidGuests.push({ ...guest, error: 'Invalid email format' });
+        continue;
+      }
+      
+      if (guest.phone && !isValidPhone(guest.phone)) {
+        invalidGuests.push({ ...guest, error: 'Invalid phone format' });
+        continue;
+      }
+      
+      validGuests.push(guest);
+    }
+
+    if (validGuests.length === 0) {
+      return res.status(400).json({
+        error: true,
+        message: 'No valid guest data found after validation',
+        data: { invalidGuests }
+      });
+    }
+
     // Check for duplicate phone numbers
-    const phoneNumbers = guests.map(g => g.phone).filter(Boolean);
+    const phoneNumbers = validGuests.map(g => g.phone).filter(Boolean);
     const duplicates = await checkDuplicatePhones(eventId, phoneNumbers);
     
     if (duplicates.length > 0) {
@@ -386,9 +458,10 @@ router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, uplo
     const createdGuests = [];
     const errors = [];
 
-    for (let i = 0; i < guests.length; i++) {
+    // Process valid guests
+    for (let i = 0; i < validGuests.length; i++) {
       try {
-        const guest = guests[i];
+        const guest = validGuests[i];
         const guestId = generateId();
         const rsvpToken = generateRSVPToken();
 
@@ -407,7 +480,7 @@ router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, uplo
         // Format phone number if provided
         const formattedPhone = guest.phone ? formatPhoneNumber(guest.phone) : null;
 
-        // Create guest
+        // Create guest with parameterized query
         await pool.execute(
           `INSERT INTO guests (
             id, event_id, name, email, phone, table_number, guest_count,
@@ -416,12 +489,12 @@ router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, uplo
           [
             guestId, 
             eventId, 
-            guest.name, 
-            guest.email || null, 
+            guest.name.trim(), 
+            guest.email ? guest.email.trim() : null, 
             formattedPhone || null,
-            guest.tableNumber || null, 
+            guest.tableNumber ? guest.tableNumber.trim() : null, 
             guest.guestCount || 1, 
-            guest.specialRequests || null, 
+            guest.specialRequests ? guest.specialRequests.trim() : null, 
             rsvpToken,
             alias
           ]
@@ -447,26 +520,30 @@ router.post('/:eventId/upload-csv', validateEventId, requireEventOwnership, uplo
       } catch (error) {
         errors.push({
           index: i,
-          guest: guests[i],
+          guest: validGuests[i],
           error: error.message
         });
       }
     }
 
+    // Log successful upload
+    // console.log(`File upload completed: User ${userId}, Event ${eventId}, Created: ${createdGuests.length}, Errors: ${errors.length}`);
+
     res.status(201).json({
       success: true,
-      message: `Successfully imported ${createdGuests.length} guests from CSV`,
+      message: `Successfully imported ${createdGuests.length} guests from file`,
       data: {
         createdGuests,
-        errors: errors.length > 0 ? errors : undefined
+        errors: errors.length > 0 ? errors : undefined,
+        invalidGuests: invalidGuests.length > 0 ? invalidGuests : undefined
       }
     });
 
   } catch (error) {
-    console.error('CSV upload error:', error);
+    // console.error('CSV upload error:', error);
     res.status(500).json({
       error: true,
-      message: 'Error processing CSV file'
+      message: 'Error processing file'
     });
   }
 });
@@ -520,7 +597,7 @@ router.get('/:eventId', validateEventId, requireEventOwnership, async (req, res)
     });
 
   } catch (error) {
-    console.error('Get guests error:', error);
+    // console.error('Get guests error:', error);
     res.status(500).json({
       error: true,
       message: 'Error fetching guests'
@@ -554,7 +631,7 @@ router.get('/:eventId/:guestId', validateEventId, requireEventOwnership, validat
     });
 
   } catch (error) {
-    console.error('Get guest error:', error);
+    // console.error('Get guest error:', error);
     res.status(500).json({
       error: true,
       message: 'Error fetching guest'
@@ -582,52 +659,51 @@ router.put('/:eventId/:guestId', validateEventId, requireEventOwnership, validat
       });
     }
 
-    // Build update query
-    const updateFields = [];
-    const updateValues = [];
-
+    // Define allowed fields for guest updates
     const allowedFields = [
       'name', 'email', 'phone', 'table_number', 'guest_count', 'special_requests'
     ];
 
-    allowedFields.forEach(field => {
-      if (updateData[field] !== undefined) {
-        updateFields.push(`${field} = ?`);
-        updateValues.push(updateData[field]);
-      }
-    });
+    try {
+      // Build secure update query
+      const updateQuery = buildSecureUpdateQuery(
+        'guests',
+        allowedFields,
+        updateData,
+        'id = ? AND event_id = ?',
+        [guestId, eventId]
+      );
 
-    if (updateFields.length === 0) {
-      return res.status(400).json({
-        error: true,
-        message: 'No valid fields to update'
+      // Execute the update
+      await pool.execute(updateQuery.query, updateQuery.params);
+
+      // Get updated guest
+      const [guests] = await pool.execute(
+        'SELECT * FROM guests WHERE id = ?',
+        [guestId]
+      );
+
+      res.json({
+        success: true,
+        message: 'Guest updated successfully',
+        data: {
+          guest: guests[0],
+          updatedFields: updateQuery.updateFields
+        }
       });
+
+    } catch (updateError) {
+      if (updateError.message === 'No valid fields to update') {
+        return res.status(400).json({
+          error: true,
+          message: updateError.message
+        });
+      }
+      throw updateError;
     }
 
-    updateValues.push(guestId);
-
-    // Update guest
-    await pool.execute(
-      `UPDATE guests SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      updateValues
-    );
-
-    // Get updated guest
-    const [guests] = await pool.execute(
-      'SELECT * FROM guests WHERE id = ?',
-      [guestId]
-    );
-
-    res.json({
-      success: true,
-      message: 'Guest updated successfully',
-      data: {
-        guest: guests[0]
-      }
-    });
-
   } catch (error) {
-    console.error('Update guest error:', error);
+    // console.error('Update guest error:', error);
     res.status(500).json({
       error: true,
       message: 'Error updating guest'
@@ -663,7 +739,7 @@ router.delete('/:eventId/:guestId', validateEventId, requireEventOwnership, vali
     });
 
   } catch (error) {
-    console.error('Delete guest error:', error);
+    // console.error('Delete guest error:', error);
     res.status(500).json({
       error: true,
       message: 'Error deleting guest'
@@ -695,7 +771,7 @@ router.get('/:eventId/export-csv', validateEventId, requireEventOwnership, async
     res.send(csvContent);
 
   } catch (error) {
-    console.error('Export CSV error:', error);
+    // console.error('Export CSV error:', error);
     res.status(500).json({
       error: true,
       message: 'Error exporting guests'

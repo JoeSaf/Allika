@@ -40,7 +40,7 @@ export const generateQRCode = async (data) => {
     });
     return qrCodeDataURL;
   } catch (error) {
-    console.error('Error generating QR code:', error);
+    // console.error('Error generating QR code:', error);
     throw new Error('Failed to generate QR code');
   }
 };
@@ -192,21 +192,209 @@ export const generateEventSlug = (title) => {
     .trim('-');
 };
 
-// Validate file upload
-export const validateFileUpload = (file, allowedTypes = ['image/jpeg', 'image/png', 'image/gif'], maxSize = 5 * 1024 * 1024) => {
-  if (!file) {
-    throw new Error('No file uploaded');
-  }
+// Enhanced file upload security utilities
+import crypto from 'crypto';
+import path from 'path';
+
+// File type signatures (magic numbers)
+const FILE_SIGNATURES = {
+  // Images
+  'image/jpeg': [0xFF, 0xD8, 0xFF],
+  'image/png': [0x89, 0x50, 0x4E, 0x47],
+  'image/gif': [0x47, 0x49, 0x46],
   
-  if (!allowedTypes.includes(file.mimetype)) {
-    throw new Error(`File type not allowed. Allowed types: ${allowedTypes.join(', ')}`);
-  }
+  // Documents
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [0x50, 0x4B, 0x03, 0x04], // XLSX
+  'application/vnd.ms-excel': [0xD0, 0xCF, 0x11, 0xE0], // XLS
+  'text/csv': null, // CSV doesn't have a specific signature
+};
+
+// Allowed file types with their extensions
+const ALLOWED_FILE_TYPES = {
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/png': ['.png'],
+  'image/gif': ['.gif'],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+  'application/vnd.ms-excel': ['.xls'],
+  'text/csv': ['.csv'],
+};
+
+// Maximum file sizes (in bytes)
+const MAX_FILE_SIZES = {
+  'image': 5 * 1024 * 1024, // 5MB for images
+  'document': 10 * 1024 * 1024, // 10MB for documents
+};
+
+// Check if buffer matches file signature
+export const validateFileSignature = (buffer, expectedMimeType) => {
+  const signature = FILE_SIGNATURES[expectedMimeType];
+  if (!signature) return true; // No signature to check (e.g., CSV)
   
+  if (buffer.length < signature.length) return false;
+  
+  for (let i = 0; i < signature.length; i++) {
+    if (buffer[i] !== signature[i]) return false;
+  }
+  return true;
+};
+
+// Detect file type from buffer
+export const detectFileType = (buffer) => {
+  for (const [mimeType, signature] of Object.entries(FILE_SIGNATURES)) {
+    if (signature && validateFileSignature(buffer, mimeType)) {
+      return mimeType;
+    }
+  }
+  return null;
+};
+
+// Validate file extension
+export const validateFileExtension = (filename, allowedMimeTypes) => {
+  const ext = path.extname(filename).toLowerCase();
+  const allowedExtensions = allowedMimeTypes.flatMap(mimeType => 
+    ALLOWED_FILE_TYPES[mimeType] || []
+  );
+  return allowedExtensions.includes(ext);
+};
+
+// Enhanced file upload validation
+export const validateSecureFileUpload = (file, options = {}) => {
+  const {
+    allowedTypes = ['image/jpeg', 'image/png', 'image/gif'],
+    maxSize = 5 * 1024 * 1024,
+    requireSignature = true,
+    scanForMalware = true
+  } = options;
+
+  // Basic checks
+  if (!file || !file.buffer) {
+    throw new Error('No file uploaded or invalid file data');
+  }
+
+  // Check file size
   if (file.size > maxSize) {
     throw new Error(`File too large. Maximum size: ${maxSize / (1024 * 1024)}MB`);
   }
+
+  // Validate file extension
+  if (!validateFileExtension(file.originalname, allowedTypes)) {
+    throw new Error(`Invalid file extension. Allowed: ${allowedTypes.join(', ')}`);
+  }
+
+  // Check MIME type
+  if (!allowedTypes.includes(file.mimetype)) {
+    throw new Error(`File type not allowed. Allowed types: ${allowedTypes.join(', ')}`);
+  }
+
+  // Validate file signature (prevent MIME spoofing)
+  if (requireSignature && !validateFileSignature(file.buffer, file.mimetype)) {
+    throw new Error('File signature validation failed. File may be corrupted or malicious.');
+  }
+
+  // Detect actual file type from buffer
+  const detectedType = detectFileType(file.buffer);
+  if (detectedType && detectedType !== file.mimetype) {
+    throw new Error('File type mismatch. File extension does not match actual content.');
+  }
+
+  // Basic malware detection (check for executable signatures)
+  if (scanForMalware) {
+    const executableSignatures = [
+      [0x4D, 0x5A], // MZ (Windows executable)
+      [0x7F, 0x45, 0x4C, 0x46], // ELF (Linux executable)
+      [0xFE, 0xED, 0xFA, 0xCE], // Mach-O (macOS executable)
+    ];
+
+    for (const signature of executableSignatures) {
+      if (validateFileSignature(file.buffer, signature)) {
+        throw new Error('Executable files are not allowed.');
+      }
+    }
+  }
+
+  // Generate secure filename
+  const secureFilename = generateSecureFilename(file.originalname);
+
+  return {
+    isValid: true,
+    secureFilename,
+    detectedType: detectedType || file.mimetype,
+    fileSize: file.size
+  };
+};
+
+// Generate secure filename
+export const generateSecureFilename = (originalName) => {
+  const timestamp = Date.now();
+  const randomString = crypto.randomBytes(8).toString('hex');
+  const ext = path.extname(originalName).toLowerCase();
+  const sanitizedName = path.basename(originalName, ext)
+    .replace(/[^a-zA-Z0-9]/g, '_')
+    .substring(0, 20);
+  
+  return `${sanitizedName}_${timestamp}_${randomString}${ext}`;
+};
+
+// Enhanced file upload for images
+export const validateImageUpload = (file) => {
+  return validateSecureFileUpload(file, {
+    allowedTypes: ['image/jpeg', 'image/png', 'image/gif'],
+    maxSize: MAX_FILE_SIZES.image,
+    requireSignature: true,
+    scanForMalware: true
+  });
+};
+
+// Enhanced file upload for documents
+export const validateDocumentUpload = (file) => {
+  return validateSecureFileUpload(file, {
+    allowedTypes: [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv'
+    ],
+    maxSize: MAX_FILE_SIZES.document,
+    requireSignature: true,
+    scanForMalware: true
+  });
+};
+
+// Rate limiting for file uploads
+const uploadAttempts = new Map();
+const UPLOAD_RATE_LIMIT = {
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxAttempts: 10 // 10 uploads per 15 minutes
+};
+
+export const checkUploadRateLimit = (userId) => {
+  const now = Date.now();
+  const userAttempts = uploadAttempts.get(userId) || [];
+  
+  // Remove old attempts
+  const recentAttempts = userAttempts.filter(time => now - time < UPLOAD_RATE_LIMIT.windowMs);
+  
+  if (recentAttempts.length >= UPLOAD_RATE_LIMIT.maxAttempts) {
+    throw new Error('Upload rate limit exceeded. Please try again later.');
+  }
+  
+  // Add current attempt
+  recentAttempts.push(now);
+  uploadAttempts.set(userId, recentAttempts);
   
   return true;
+};
+
+// Clean up old rate limit entries
+export const cleanupUploadRateLimits = () => {
+  const now = Date.now();
+  for (const [userId, attempts] of uploadAttempts.entries()) {
+    const recentAttempts = attempts.filter(time => now - time < UPLOAD_RATE_LIMIT.windowMs);
+    if (recentAttempts.length === 0) {
+      uploadAttempts.delete(userId);
+    } else {
+      uploadAttempts.set(userId, recentAttempts);
+    }
+  }
 };
 
 // Generate random string
@@ -304,7 +492,7 @@ export const formatTimeInWords = (timeString, language = 'en') => {
       });
     }
   } catch (error) {
-    console.error('Error formatting time in words:', error);
+    // console.error('Error formatting time in words:', error);
     return timeString; // Return original if formatting fails
   }
 };
@@ -337,7 +525,7 @@ export const formatDateInWords = (dateString, language = 'en') => {
       return date.toLocaleDateString('en-US', options);
     }
   } catch (error) {
-    console.error('Error formatting date in words:', error);
+    // console.error('Error formatting date in words:', error);
     return dateString; // Return original if formatting fails
   }
 }; 
@@ -348,4 +536,247 @@ export const generateRSVPAlias = (guestName, eventTitle) => {
   let base = `${guestName}-${eventTitle}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   // Truncate to 40 chars for safety
   return base.slice(0, 40);
+}; 
+
+// Image caching for generated invitations
+const imageCache = new Map();
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+// Cache generated invitation images
+export const cacheInvitationImage = (key, imageBuffer) => {
+  imageCache.set(key, {
+    buffer: imageBuffer,
+    timestamp: Date.now()
+  });
+};
+
+// Get cached invitation image
+export const getCachedInvitationImage = (key) => {
+  const cached = imageCache.get(key);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    return cached.buffer;
+  }
+  if (cached) {
+    imageCache.delete(key); // Remove expired cache
+  }
+  return null;
+};
+
+// Clear expired cache entries (run periodically)
+export const cleanupImageCache = () => {
+  const now = Date.now();
+  for (const [key, value] of imageCache.entries()) {
+    if ((now - value.timestamp) >= CACHE_TTL) {
+      imageCache.delete(key);
+    }
+  }
+};
+
+// Generate cache key for invitation
+export const generateInvitationCacheKey = (tokenOrAlias, template = 'default') => {
+  return `invitation_${tokenOrAlias}_${template}`;
+}; 
+
+// Performance monitoring for image generation
+const performanceMetrics = {
+  totalGenerations: 0,
+  cacheHits: 0,
+  cacheMisses: 0,
+  averageGenerationTime: 0,
+  lastGenerationTime: 0
+};
+
+// Track image generation performance
+export const trackImageGeneration = (startTime, wasCached = false) => {
+  const generationTime = Date.now() - startTime;
+  
+  performanceMetrics.totalGenerations++;
+  performanceMetrics.lastGenerationTime = generationTime;
+  
+  if (wasCached) {
+    performanceMetrics.cacheHits++;
+  } else {
+    performanceMetrics.cacheMisses++;
+    // Update average generation time (excluding cached hits)
+    const totalMisses = performanceMetrics.cacheMisses;
+    performanceMetrics.averageGenerationTime = 
+      ((performanceMetrics.averageGenerationTime * (totalMisses - 1)) + generationTime) / totalMisses;
+  }
+};
+
+// Get performance metrics
+export const getImageGenerationMetrics = () => {
+  const hitRate = performanceMetrics.totalGenerations > 0 
+    ? (performanceMetrics.cacheHits / performanceMetrics.totalGenerations * 100).toFixed(2)
+    : 0;
+    
+  return {
+    totalGenerations: performanceMetrics.totalGenerations,
+    cacheHits: performanceMetrics.cacheHits,
+    cacheMisses: performanceMetrics.cacheMisses,
+    cacheHitRate: `${hitRate}%`,
+    averageGenerationTime: `${performanceMetrics.averageGenerationTime.toFixed(0)}ms`,
+    lastGenerationTime: `${performanceMetrics.lastGenerationTime}ms`,
+    cacheSize: imageCache.size
+  };
+}; 
+
+// Secure parameterized field mapping for UPDATE queries
+export const buildSecureUpdateQuery = (tableName, allowedFields, updateData, whereClause = 'id = ?', whereParams = []) => {
+  const updateFields = [];
+  const updateValues = [];
+  
+  // Validate and sanitize field names
+  const sanitizedAllowedFields = allowedFields.filter(field => 
+    typeof field === 'string' && 
+    /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(field) && // Only alphanumeric and underscore
+    field.length <= 50 // Reasonable length limit
+  );
+  
+  // Build update fields and values
+  sanitizedAllowedFields.forEach(field => {
+    if (updateData[field] !== undefined) {
+      updateFields.push(`${field} = ?`);
+      updateValues.push(updateData[field]);
+    }
+  });
+  
+  if (updateFields.length === 0) {
+    throw new Error('No valid fields to update');
+  }
+  
+  // Build the complete query
+  const query = `UPDATE ${tableName} SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE ${whereClause}`;
+  const params = [...updateValues, ...whereParams];
+  
+  return {
+    query,
+    params,
+    updateFields: updateFields.length,
+    allowedFields: sanitizedAllowedFields
+  };
+};
+
+// Validate field names for security
+export const validateFieldName = (fieldName) => {
+  if (typeof fieldName !== 'string') {
+    return false;
+  }
+  
+  // Only allow alphanumeric characters and underscores
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(fieldName)) {
+    return false;
+  }
+  
+  // Prevent SQL injection attempts
+  const blacklistedKeywords = [
+    'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER', 'TRUNCATE',
+    'UNION', 'EXEC', 'EXECUTE', 'SCRIPT', 'DECLARE', 'CAST', 'CONVERT'
+  ];
+  
+  const upperFieldName = fieldName.toUpperCase();
+  if (blacklistedKeywords.some(keyword => upperFieldName.includes(keyword))) {
+    return false;
+  }
+  
+  return true;
+}; 
+
+// Secure IN clause builder for parameterized queries
+export const buildSecureInClause = (values, fieldName = 'id') => {
+  if (!Array.isArray(values) || values.length === 0) {
+    throw new Error('Values array must be provided and non-empty');
+  }
+  
+  // Validate field name
+  if (!validateFieldName(fieldName)) {
+    throw new Error('Invalid field name');
+  }
+  
+  // Create placeholders for each value
+  const placeholders = values.map(() => '?').join(',');
+  const query = `${fieldName} IN (${placeholders})`;
+  
+  return {
+    query,
+    params: values
+  };
+}; 
+
+// Security test functions (for development/testing only)
+export const testSecureUpdateQuery = () => {
+  const testCases = [
+    {
+      name: 'Normal update',
+      input: {
+        tableName: 'users',
+        allowedFields: ['name', 'email'],
+        updateData: { name: 'John', email: 'john@example.com' },
+        whereClause: 'id = ?',
+        whereParams: ['123']
+      },
+      expected: {
+        query: 'UPDATE users SET name = ?, email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        params: ['John', 'john@example.com', '123'],
+        updateFields: 2
+      }
+    },
+    {
+      name: 'SQL injection attempt',
+      input: {
+        tableName: 'users',
+        allowedFields: ['name', 'email; DROP TABLE users; --'],
+        updateData: { name: 'John', 'email; DROP TABLE users; --': 'malicious' },
+        whereClause: 'id = ?',
+        whereParams: ['123']
+      },
+      expected: {
+        query: 'UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        params: ['John', '123'],
+        updateFields: 1
+      }
+    },
+    {
+      name: 'Invalid field names filtered out',
+      input: {
+        tableName: 'users',
+        allowedFields: ['name', '123invalid', 'SELECT * FROM users'],
+        updateData: { name: 'John', '123invalid': 'test', 'SELECT * FROM users': 'malicious' },
+        whereClause: 'id = ?',
+        whereParams: ['123']
+      },
+      expected: {
+        query: 'UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        params: ['John', '123'],
+        updateFields: 1
+      }
+    }
+  ];
+
+  console.log('🧪 Testing secure update query...');
+  
+  testCases.forEach((testCase, index) => {
+    try {
+      const result = buildSecureUpdateQuery(
+        testCase.input.tableName,
+        testCase.input.allowedFields,
+        testCase.input.updateData,
+        testCase.input.whereClause,
+        testCase.input.whereParams
+      );
+      
+      const passed = 
+        result.query === testCase.expected.query &&
+        JSON.stringify(result.params) === JSON.stringify(testCase.expected.params) &&
+        result.updateFields === testCase.expected.updateFields;
+      
+      console.log(`  ${passed ? '✅' : '❌'} Test ${index + 1}: ${testCase.name}`);
+      if (!passed) {
+        console.log(`    Expected: ${JSON.stringify(testCase.expected)}`);
+        console.log(`    Got: ${JSON.stringify(result)}`);
+      }
+    } catch (error) {
+      console.log(`  ❌ Test ${index + 1}: ${testCase.name} - Error: ${error.message}`);
+    }
+  });
 }; 
