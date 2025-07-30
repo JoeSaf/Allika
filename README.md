@@ -307,4 +307,4 @@ If you encounter any issues or have questions:
 
 ---
 
-**Made with ❤️ by the Allika Team**
+**Made with ❤️ by the Nejo Team**
