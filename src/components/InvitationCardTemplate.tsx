@@ -3,6 +3,7 @@ import { Card } from "./ui/card";
 import { QrCode } from "lucide-react";
 import QRCode from "qrcode";
 import createQRWithLogo from "qrcode-with-logos";
+import { CustomCardTemplate } from "./CustomCardTemplate";
 
 interface InvitationCardTemplateProps {
   invitationData: any;
@@ -309,7 +310,27 @@ export const InvitationCardTemplate: React.FC<InvitationCardTemplateProps> = ({
     </Card>
   );
 
+  // Custom card template
+  const renderCustomTemplate = () => {
+    if (!event?.customCardImageUrl) {
+      return renderTemplate1(); // Fallback to template1 if no custom card
+    }
+
+    return (
+      <CustomCardTemplate
+        customCardImage={event.customCardImageUrl}
+        guest={guest}
+        event={event}
+        qrCode={qrWithLogo || qrCode}
+        overlayPositions={event.customCardOverlayData}
+        className={className}
+      />
+    );
+  };
+
   switch (template) {
+  case "custom":
+    return renderCustomTemplate();
   case "template2":
     return renderTemplate2();
   case "template3":

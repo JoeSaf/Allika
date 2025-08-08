@@ -147,7 +147,14 @@ const Dashboard = () => {
       }
 
       console.log("[Dashboard] Navigating to event editor with event ID:", id);
-      navigate(`/event/${id}`);
+      
+      // Check if this is a custom card event
+      const event = events.find(e => e.id === id);
+      if (event && event.design_method === 'custom') {
+        navigate(`/custom-card/${id}`);
+      } else {
+        navigate(`/event/${id}`);
+      }
     } catch (error) {
       console.error("Error navigating to event editor:", error);
       toast({

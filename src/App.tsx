@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import InvitationCard from "./pages/InvitationCard";
 import Rsvp from "./pages/Rsvp";
+import CustomCardEditor from "./pages/CustomCardEditor";
 
 // Components
 import IdleSessionHandler from "@/components/IdleSessionHandler";
@@ -48,6 +49,7 @@ const App = (): JSX.Element => {
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/analytics/:eventId" element={<ViewAnalytics />} />
             <Route path="/qr-scanner/:eventId" element={<QrScanner />} />
+            <Route path="/custom-card/:eventId" element={<CustomCardEditor />} />
             <Route path="/invitation/:token" element={<InvitationCard />} />
             <Route path="/rsvp/:token" element={<Rsvp />} />
             <Route path="*" element={<NotFound />} />

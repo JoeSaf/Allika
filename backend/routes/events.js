@@ -1,9 +1,16 @@
 import express from 'express';
 import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { getPool } from '../config/database.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import { authenticateToken, requireEventOwnership } from '../middleware/auth.js';
 import { validateCreateEvent, validateUpdateEvent, validateUUID, validateEventId, validatePagination } from '../middleware/validation.js';
-import { generateId, validateImageUpload, checkUploadRateLimit, generateSecureFilename, buildSecureUpdateQuery } from '../utils/helpers.js';
+import { generateId, validateImageUpload, checkUploadRateLimit, generateSecureFilename, buildSecureUpdateQuery, clearUploadRateLimit, getUploadRateLimitStatus } from '../utils/helpers.js';
 import { getPaginationInfo } from '../utils/helpers.js';
 
 const router = express.Router();
@@ -34,6 +41,107 @@ const imageUpload = multer({
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
+// Debug route to check and clear rate limits (development only)
+if (process.env.NODE_ENV === 'development') {
+  router.get('/debug/rate-limit/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const status = getUploadRateLimitStatus(userId);
+      
+      res.json({
+        success: true,
+        data: status
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  });
+
+  router.delete('/debug/rate-limit/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      clearUploadRateLimit(userId);
+      
+      res.json({
+        success: true,
+        message: `Rate limit cleared for user ${userId}`
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  });
+}
+
+// POST /api/events/upload-custom-card - Upload custom card image
+// This route must be defined before the general POST route to avoid JSON parsing conflicts
+router.post('/upload-custom-card', imageUpload.single('customCard'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No image file provided'
+      });
+    }
+
+    // Validate file
+    const validationResult = validateImageUpload(req.file);
+    if (!validationResult.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: validationResult.error
+      });
+    }
+
+    // Check upload rate limit
+    console.log(`Checking rate limit for user: ${req.user.id}`);
+    try {
+      const rateLimitResult = checkUploadRateLimit(req.user.id);
+      console.log(`Rate limit check passed for user: ${req.user.id}`);
+    } catch (error) {
+      console.log(`Rate limit exceeded for user: ${req.user.id}`);
+      return res.status(429).json({
+        success: false,
+        message: 'Upload rate limit exceeded. Please try again later.'
+      });
+    }
+
+    // Generate secure filename
+    const filename = generateSecureFilename(req.file.originalname);
+    
+    // Create uploads directory if it doesn't exist
+    const uploadsDir = path.join(__dirname, '../uploads/custom-cards');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    
+    // Save file to local storage
+    const filePath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filePath, req.file.buffer);
+    
+    // Return the URL to the uploaded file
+    const imageUrl = `/uploads/custom-cards/${filename}`;
+    
+    res.json({
+      success: true,
+      data: {
+        imageUrl: imageUrl
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading custom card:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload custom card'
+    });
+  }
+});
+
 // POST /api/events - Create new event
 router.post('/', validateCreateEvent, async (req, res) => {
   const pool = getPool();
@@ -57,22 +165,52 @@ router.post('/', validateCreateEvent, async (req, res) => {
       theme,
       rsvpContact,
       rsvpContactSecondary,
-      dateLang
+      dateLang,
+      designMethod,
+      customCardImageUrl,
+      customCardOverlayData
     } = req.body;
 
     const eventId = generateId();
 
     // Create event
-    await connection.execute(
-      `INSERT INTO events (
-        id, user_id, title, type, date, time, venue, additional_info, inviting_family, reception, reception_time, theme, rsvp_contact, rsvp_contact_secondary, date_lang
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        eventId, userId,
-        title ?? null, type ?? null, date ?? null, time ?? null, venue ?? null, additionalInfo ?? null,
-        invitingFamily ?? null, reception ?? null, receptionTime ?? null, theme ?? null, rsvpContact ?? null, rsvpContactSecondary ?? null, dateLang ?? 'en'
-      ]
-    );
+    try {
+      console.log('Creating event with data:', {
+        eventId,
+        userId,
+        title,
+        type,
+        designMethod,
+        customCardImageUrl,
+        customCardOverlayData
+      });
+      
+      await connection.execute(
+        `INSERT INTO events (
+          id, user_id, title, type, date, time, venue, additional_info, inviting_family, reception, reception_time, theme, rsvp_contact, rsvp_contact_secondary, date_lang, design_method, custom_card_image_url, custom_card_overlay_data
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          eventId, userId,
+          title ?? null, type ?? null, 
+          // For custom cards, use minimal data since details are on the card
+          designMethod === 'custom' ? null : (date ?? null), 
+          designMethod === 'custom' ? null : (time ?? null), 
+          designMethod === 'custom' ? null : (venue ?? null), 
+          designMethod === 'custom' ? null : (additionalInfo ?? null),
+          designMethod === 'custom' ? null : (invitingFamily ?? null), 
+          designMethod === 'custom' ? null : (reception ?? null), 
+          designMethod === 'custom' ? null : (receptionTime ?? null), 
+          designMethod === 'custom' ? null : (theme ?? null), 
+          designMethod === 'custom' ? null : (rsvpContact ?? null), 
+          designMethod === 'custom' ? null : (rsvpContactSecondary ?? null), 
+          dateLang ?? 'en',
+          designMethod ?? 'template', customCardImageUrl ?? null, customCardOverlayData ? JSON.stringify(customCardOverlayData) : null
+        ]
+      );
+    } catch (error) {
+      console.error('Error creating event:', error);
+      throw error;
+    }
 
     // Verify event was created
     const [events] = await connection.execute(
@@ -276,7 +414,7 @@ router.get('/:id', validateUUID, requireEventOwnership, async (req, res) => {
 
     // Get event with all related data
     const [events] = await pool.execute(
-      `SELECT e.id, e.user_id, e.title, e.type, e.date, e.time, e.venue, e.reception, e.reception_time, e.theme, e.rsvp_contact, e.additional_info, e.inviting_family, e.status, e.created_at, e.updated_at, e.date_lang,
+      `SELECT e.id, e.user_id, e.title, e.type, e.date, e.time, e.venue, e.reception, e.reception_time, e.theme, e.rsvp_contact, e.additional_info, e.inviting_family, e.status, e.created_at, e.updated_at, e.date_lang, e.design_method, e.custom_card_image_url, e.custom_card_overlay_data,
               rs.id as rsvp_id, rs.title as rsvp_title, rs.subtitle as rsvp_subtitle, rs.location as rsvp_location, rs.welcome_message, rs.confirm_text, rs.decline_text, rs.guest_count_enabled, rs.guest_count_label, rs.guest_count_options, rs.special_requests_enabled, rs.special_requests_label, rs.special_requests_placeholder, rs.additional_fields, rs.submit_button_text, rs.thank_you_message, rs.background_color, rs.text_color, rs.button_color, rs.accent_color, rs.rsvp_contact as rsvp_contact_info,
               eid.id as invitation_id, eid.couple_name, eid.event_date, eid.event_date_words, eid.event_time as invitation_time, eid.venue as invitation_venue, eid.reception as invitation_reception, eid.reception_time as invitation_reception_time, eid.theme as invitation_theme, eid.rsvp_contact as invitation_rsvp_contact, eid.additional_info as invitation_additional_info, eid.inviting_family as invitation_inviting_family, eid.guest_name, eid.invitation_image, eid.selected_template,
               COUNT(g.id) as guest_count,
@@ -342,15 +480,22 @@ router.put('/:id', validateUUID, requireEventOwnership, validateUpdateEvent, asy
     // Define allowed fields for event updates
     const allowedFields = [
       'title', 'type', 'date', 'time', 'venue', 'reception', 'reception_time',
-      'theme', 'rsvp_contact', 'rsvp_contact_secondary', 'additional_info', 'inviting_family', 'status'
+      'theme', 'rsvp_contact', 'rsvp_contact_secondary', 'additional_info', 'inviting_family', 'status',
+      'custom_card_overlay_data'
     ];
 
     try {
+      // Handle custom card overlay data separately if present
+      let processedUpdateData = { ...updateData };
+      if (updateData.custom_card_overlay_data !== undefined) {
+        processedUpdateData.custom_card_overlay_data = JSON.stringify(updateData.custom_card_overlay_data);
+      }
+
       // Build secure update query
       const updateQuery = buildSecureUpdateQuery(
         'events',
         allowedFields,
-        updateData,
+        processedUpdateData,
         'id = ?',
         [id]
       );

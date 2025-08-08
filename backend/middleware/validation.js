@@ -1,4 +1,5 @@
 import { body, param, query, validationResult } from 'express-validator';
+import validator from 'validator';
 
 export const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
@@ -56,9 +57,22 @@ export const validateCreateEvent = [
   body('type')
     .isIn(['wedding', 'birthday', 'anniversary', 'graduation', 'corporate', 'conference', 'awards', 'festival', 'meeting', 'seminar', 'other'])
     .withMessage('Please select a valid event type'),
+  body('designMethod')
+    .optional()
+    .isIn(['template', 'custom'])
+    .withMessage('Design method must be either "template" or "custom"'),
   body('date')
-    .isISO8601()
-    .withMessage('Please provide a valid date'),
+    .optional()
+    .custom((value, { req }) => {
+      // Date is required for template events, optional for custom cards
+      if (req.body.designMethod === 'template' && !value) {
+        throw new Error('Date is required for template events');
+      }
+      if (value && !validator.isISO8601(value)) {
+        throw new Error('Please provide a valid date');
+      }
+      return true;
+    }),
   body('time')
     .optional()
     .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
@@ -98,13 +112,8 @@ export const validateCreateEvent = [
   body('invitingFamily')
     .optional()
     .trim()
-    .isLength({ max: 255 })
-    .withMessage('Inviting family must be less than 255 characters'),
-  body('dateLang')
-    .optional()
-    .isString()
-    .isLength({ max: 10 })
-    .withMessage('Date language must be a string up to 10 characters'),
+    .isLength({ max: 500 })
+    .withMessage('Inviting family must be less than 500 characters'),
   handleValidationErrors
 ];
 

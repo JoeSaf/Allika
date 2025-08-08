@@ -9,6 +9,8 @@ import { apiService } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
+import { CustomCardUpload } from "./CustomCardUpload";
+import { Palette, Upload } from "lucide-react";
 
 interface EventCreationModalProps {
   open: boolean;
@@ -35,6 +37,12 @@ interface EventFormData {
   rsvpContactSecondary: string;
 }
 
+interface OverlayPositions {
+  guestName: { x: number; y: number; width: number; height: number };
+  qrCode: { x: number; y: number; size: number };
+  guestCount: { x: number; y: number; width: number; height: number };
+}
+
 const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<EventFormData>({
@@ -56,6 +64,13 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
   const phoneRegex = /^\+?\d{10,15}$/;
   const [rsvpContactError, setRsvpContactError] = useState("");
   const [rsvpContactSecondaryError, setRsvpContactSecondaryError] = useState("");
+
+  // Custom card state
+  const [designMethod, setDesignMethod] = useState<"template" | "custom">("template");
+  const [customCardFile, setCustomCardFile] = useState<File | null>(null);
+  const [customCardImageUrl, setCustomCardImageUrl] = useState<string>("");
+  const [customCardBlobUrl, setCustomCardBlobUrl] = useState<string>("");
+  const [isUploading, setIsUploading] = useState(false);
 
   const eventTypes = [
     { value: "wedding", label: "Wedding" },
@@ -100,6 +115,48 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
     }));
   };
 
+  // Custom card handling functions
+  const handleCustomCardUpload = async (file: File) => {
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('customCard', file);
+      
+      const response = await apiService.uploadCustomCard(formData);
+      if (response.success) {
+        setCustomCardFile(file);
+        setCustomCardImageUrl(response.data.imageUrl);
+        // Create blob URL for immediate display
+        const blobUrl = URL.createObjectURL(file);
+        setCustomCardBlobUrl(blobUrl);
+      } else {
+        throw new Error(response.message || 'Upload failed');
+      }
+    } catch (error) {
+      console.error('Error uploading custom card:', error);
+      toast({
+        title: "Upload Failed",
+        description: "There was a problem uploading your custom card. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleCustomCardRemove = () => {
+    setCustomCardFile(null);
+    setCustomCardImageUrl("");
+    if (customCardBlobUrl) {
+      URL.revokeObjectURL(customCardBlobUrl);
+    }
+    setCustomCardBlobUrl("");
+  };
+
+  const handlePositionsSet = (positions: OverlayPositions) => {
+    // This will be handled in the custom card editor page
+  };
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -114,6 +171,15 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
       rsvpContact: "",
       rsvpContactSecondary: "",
     });
+    // Reset custom card state
+    setDesignMethod("template");
+    setCustomCardFile(null);
+    setCustomCardImageUrl("");
+    if (customCardBlobUrl) {
+      URL.revokeObjectURL(customCardBlobUrl);
+    }
+    setCustomCardBlobUrl("");
+    setIsUploading(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,6 +189,26 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
       toast({
         title: "Event Name Required",
         description: "Please enter a name for your event.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // For custom cards, validate that a file has been uploaded
+    if (designMethod === "custom" && !customCardFile) {
+      toast({
+        title: "Custom Card Required",
+        description: "Please upload your custom invitation card.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // For template events, validate RSVP contact
+    if (designMethod === "template" && !formData.rsvpContact) {
+      toast({
+        title: "RSVP Contact Required",
+        description: "Please provide an RSVP contact phone number for template events.",
         variant: "destructive",
       });
       return;
@@ -143,6 +229,12 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
         additionalInfo: formData.description || undefined,
         invitingFamily: formData.invitingFamily || undefined,
         ...(formData.receptionTime ? { receptionTime: formData.receptionTime.slice(0, 5) } : {}),
+        // Custom card data
+        designMethod: designMethod,
+        ...(designMethod === 'custom' && {
+          customCardImageUrl: customCardImageUrl,
+          customCardOverlayData: null
+        })
       };
       const res = await apiService.createEvent(eventPayload);
       if (!res || !res.data || !res.data.event) {
@@ -172,19 +264,27 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
 
       toast({
         title: "Event Created!",
-        description: `Your ${formData.type} event "${formData.name}" has been created successfully.`,
+        description: designMethod === "custom" 
+          ? `Your custom invitation event "${formData.name}" has been created successfully.`
+          : `Your ${formData.type} event "${formData.name}" has been created successfully.`,
       });
 
-      // Navigate to dashboard
-      navigate("/dashboard", {
-        state: {
-          newlyCreatedEvent: {
-            id: newEvent.id,
-            title: newEvent.title,
-            type: newEvent.type,
+      // Navigate based on design method
+      if (designMethod === "custom") {
+        // Navigate directly to custom card editor
+        navigate(`/custom-card/${newEvent.id}`);
+      } else {
+        // Navigate to dashboard for template events
+        navigate("/dashboard", {
+          state: {
+            newlyCreatedEvent: {
+              id: newEvent.id,
+              title: newEvent.title,
+              type: newEvent.type,
+            },
           },
-        },
-      });
+        });
+      }
 
       // Log the final state after navigation
       setTimeout(() => {
@@ -195,9 +295,10 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
       }, 200);
     } catch (error) {
       console.error("Error creating event:", error);
+      const errorMessage = error instanceof Error ? error.message : 'There was a problem creating your event. Please try again.';
       toast({
         title: "Error Creating Event",
-        description: "There was a problem creating your event. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -219,7 +320,7 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md max-h-[80vh] overflow-y-auto">
+      <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white text-xl">Create New Event</DialogTitle>
           <DialogDescription>
@@ -228,133 +329,229 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="name" className="text-slate-300">Event Name *</Label>
-            <Input
-              id="name"
-              name="name"
-              type="text"
-              placeholder="e.g., John & Doe's Wedding"
-              value={formData.name}
-              onChange={handleInputChange}
-              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
-              required
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="type" className="text-slate-300">Event Type *</Label>
-            <Select value={formData.type} onValueChange={handleTypeChange} disabled={isSubmitting}>
-              <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-700 border-slate-600">
-                {eventTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value} className="text-white hover:bg-slate-600">
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="venue" className="text-slate-300">Venue</Label>
-            <Input
-              id="venue"
-              name="venue"
-              type="text"
-              placeholder="e.g., St. Church"
-              value={formData.venue}
-              onChange={handleInputChange}
-              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="date" className="text-slate-300">Date</Label>
-              <Input
-                id="date"
-                name="date"
-                type="date"
-                value={formData.date}
-                onChange={handleInputChange}
-                className="bg-slate-700 border-slate-600 text-white"
+          {/* Design Method Selection */}
+          <div className="space-y-3">
+            <Label className="text-slate-300">Design Method</Label>
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant={designMethod === "template" ? "default" : "outline"}
+                onClick={() => setDesignMethod("template")}
                 disabled={isSubmitting}
+                className="flex-1 flex items-center gap-2"
+              >
+                <Palette className="w-4 h-4" />
+                Use Templates
+              </Button>
+              <Button
+                type="button"
+                variant={designMethod === "custom" ? "default" : "outline"}
+                onClick={() => setDesignMethod("custom")}
+                disabled={isSubmitting}
+                className="flex-1 flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Upload Custom Card
+              </Button>
+            </div>
+            <div className="text-xs text-slate-400">
+              {designMethod === "template" 
+                ? "Choose from our beautiful pre-designed templates" 
+                : "Upload your own invitation card design - we'll add guest names and QR codes automatically"
+              }
+            </div>
+          </div>
+
+          {/* Custom Card Upload Section */}
+          {designMethod === "custom" && (
+            <>
+              <CustomCardUpload
+                onFileUpload={handleCustomCardUpload}
+                onFileRemove={handleCustomCardRemove}
+                uploadedFile={customCardFile}
+                uploadedImageUrl={customCardBlobUrl || customCardImageUrl}
+                isUploading={isUploading}
               />
-              {/* Language selector for date */}
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs text-slate-400">Display date in:</span>
-                <Select value={dateLang} onValueChange={(val) => setDateLang(val as "en" | "sw")}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-7 w-20 text-xs">
+              
+              {/* Simplified form for custom cards - only essential fields */}
+              <div className="space-y-4 pt-4 border-t border-slate-700">
+                <div className="text-sm text-slate-300 font-medium">
+                  Event Details (from your custom card)
+                </div>
+                <div className="text-xs text-slate-400 bg-slate-700/50 p-3 rounded-lg">
+                  <p>Your custom card already contains all the event details. We only need:</p>
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    <li>Event name (for our system)</li>
+                    <li>Event type (for categorization)</li>
+                  </ul>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-slate-300">Event Name *</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    type="text"
+                    placeholder="e.g., John & Doe's Wedding"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                    required
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="type" className="text-slate-300">Event Type *</Label>
+                  <Select value={formData.type} onValueChange={handleTypeChange} disabled={isSubmitting}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600">
+                      {eventTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value} className="text-white hover:bg-slate-600">
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Show full form only for template method */}
+          {designMethod === "template" && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-slate-300">Event Name *</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  type="text"
+                  placeholder="e.g., John & Doe's Wedding"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="type" className="text-slate-300">Event Type *</Label>
+                <Select value={formData.type} onValueChange={handleTypeChange} disabled={isSubmitting}>
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600 text-xs">
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="sw">Swahili</SelectItem>
+                  <SelectContent className="bg-slate-700 border-slate-600">
+                    {eventTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value} className="text-white hover:bg-slate-600">
+                        {type.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-              {/* Friendly date preview */}
-              {formData.date && (
-                <div className="text-xs text-slate-400 mt-1">
-                  {format(
-                    new Date(formData.date),
-                    "EEEE, d MMMM yyyy",
-                    { locale: enUS },
+
+              <div className="space-y-2">
+                <Label htmlFor="venue" className="text-slate-300">Venue</Label>
+                <Input
+                  id="venue"
+                  name="venue"
+                  type="text"
+                  placeholder="e.g., St. Church"
+                  value={formData.venue}
+                  onChange={handleInputChange}
+                  className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="date" className="text-slate-300">Date</Label>
+                  <Input
+                    id="date"
+                    name="date"
+                    type="date"
+                    value={formData.date}
+                    onChange={handleInputChange}
+                    className="bg-slate-700 border-slate-600 text-white"
+                    disabled={isSubmitting}
+                  />
+                  {/* Language selector for date */}
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-slate-400">Display date in:</span>
+                    <Select value={dateLang} onValueChange={(val) => setDateLang(val as "en" | "sw")}>
+                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-7 w-20 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-700 border-slate-600 text-xs">
+                        <SelectItem value="en">English</SelectItem>
+                        <SelectItem value="sw">Swahili</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {/* Friendly date preview */}
+                  {formData.date && (
+                    <div className="text-xs text-slate-400 mt-1">
+                      {format(
+                        new Date(formData.date),
+                        "EEEE, d MMMM yyyy",
+                        { locale: enUS },
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* Remove the Event Time input from the form UI */}
-          </div>
+                {/* Remove the Event Time input from the form UI */}
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description" className="text-slate-300">Description (Optional)</Label>
-            <Input
-              id="description"
-              name="description"
-              type="text"
-              placeholder="Brief description of your event"
-              value={formData.description}
-              onChange={handleInputChange}
-              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
-              disabled={isSubmitting}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-slate-300">Description (Optional)</Label>
+                <Input
+                  id="description"
+                  name="description"
+                  type="text"
+                  placeholder="Brief description of your event"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                  disabled={isSubmitting}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="invitingFamily" className="text-slate-300">Inviting Family</Label>
-            <Input
-              id="invitingFamily"
-              name="invitingFamily"
-              type="text"
-              placeholder="e.g., MR. & MRS. JOHN DOE"
-              value={formData.invitingFamily}
-              onChange={handleInputChange}
-              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
-              disabled={isSubmitting}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="invitingFamily" className="text-slate-300">Inviting Family</Label>
+                <Input
+                  id="invitingFamily"
+                  name="invitingFamily"
+                  type="text"
+                  placeholder="e.g., MR. & MRS. JOHN DOE"
+                  value={formData.invitingFamily}
+                  onChange={handleInputChange}
+                  className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                  disabled={isSubmitting}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="rsvpContact" className="text-slate-300">RSVP Contact (Phone Number)</Label>
-            <Input
-              id="rsvpContact"
-              name="rsvpContact"
-              type="tel"
-              placeholder="e.g., +255 123 456 789"
-              value={formData.rsvpContact}
-              onChange={handleInputChange}
-              className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
-              disabled={isSubmitting}
-            />
-            {rsvpContactError && <div className="text-red-400 text-xs mt-1">{rsvpContactError}</div>}
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="rsvpContact" className="text-slate-300">RSVP Contact (Phone Number)</Label>
+                <Input
+                  id="rsvpContact"
+                  name="rsvpContact"
+                  type="tel"
+                  placeholder="e.g., +255 123 456 789"
+                  value={formData.rsvpContact}
+                  onChange={handleInputChange}
+                  className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                  disabled={isSubmitting}
+                />
+                {rsvpContactError && <div className="text-red-400 text-xs mt-1">{rsvpContactError}</div>}
+              </div>
+            </>
+          )}
 
           <div className="flex gap-3 pt-4">
             <Button
@@ -376,6 +573,13 @@ const EventCreationModal = ({ open, onOpenChange }: EventCreationModalProps) => 
           </div>
         </form>
       </DialogContent>
+
+      {/* Debug info */}
+      {customCardImageUrl && (
+        <div className="fixed bottom-4 right-4 bg-black/80 text-white p-2 rounded text-xs z-50">
+          Debug: Image URL = {customCardImageUrl || 'undefined'}
+        </div>
+      )}
     </Dialog>
   );
 };

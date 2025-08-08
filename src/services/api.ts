@@ -37,6 +37,9 @@ interface Event {
   additionalInfo?: string;
   invitingFamily?: string;
   status: "draft" | "active" | "completed";
+  design_method?: "template" | "custom";
+  custom_card_image_url?: string;
+  custom_card_overlay_data?: any;
   createdAt: string;
   updatedAt: string;
 }
@@ -97,12 +100,19 @@ class ApiService {
     const url = `${this.baseURL}${endpoint}`;
     const token = getAuthToken();
 
+    // Don't set Content-Type for FormData - let the browser set it automatically
+    const headers: Record<string, string> = {
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    };
+
+    // Only set Content-Type to application/json if body is not FormData
+    if (!(options.body instanceof FormData)) {
+      headers["Content-Type"] = "application/json";
+    }
+
     const config: RequestInit = {
-      headers: {
-        "Content-Type": "application/json",
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
+      headers,
       ...options,
     };
 
@@ -111,8 +121,10 @@ class ApiService {
       const data = await response.json();
 
       if (!response.ok) {
-        const error = new Error(data.message || `HTTP error! status: ${response.status}`);
+        console.error('API Error Response:', data);
+        const error = new Error(data.message || data.details || `HTTP error! status: ${response.status}`);
         (error as any).status = response.status;
+        (error as any).details = data;
         throw error;
       }
 
@@ -175,10 +187,20 @@ class ApiService {
     rsvpContact?: string;
     additionalInfo?: string;
     invitingFamily?: string;
+    designMethod?: "template" | "custom";
+    customCardImageUrl?: string;
+    customCardOverlayData?: any;
   }): Promise<ApiResponse<{ event: Event }>> {
     return this.request("/events", {
       method: "POST",
       body: JSON.stringify(eventData),
+    });
+  }
+
+  async uploadCustomCard(formData: FormData): Promise<ApiResponse<{ imageUrl: string }>> {
+    return this.request("/events/upload-custom-card", {
+      method: "POST",
+      body: formData,
     });
   }
 
@@ -222,6 +244,7 @@ class ApiService {
       additionalInfo: string;
       invitingFamily: string;
       status: "draft" | "active" | "completed";
+      custom_card_overlay_data?: any;
     }>,
   ): Promise<ApiResponse<{ event: Event }>> {
     return this.request(`/events/${eventId}`, {

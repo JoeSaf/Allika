@@ -77,7 +77,7 @@ const createTables = async () => {
         user_id VARCHAR(36) NOT NULL,
         title VARCHAR(255) NOT NULL,
         type VARCHAR(50) NOT NULL,
-        date DATE NOT NULL,
+        date DATE,
         time TIME,
         venue VARCHAR(500),
         reception VARCHAR(500),
@@ -91,12 +91,16 @@ const createTables = async () => {
         date_lang VARCHAR(10) DEFAULT 'en',
         status ENUM('draft', 'active', 'completed') DEFAULT 'draft',
         messages_sent INT DEFAULT 0,
+        design_method ENUM('template', 'custom') DEFAULT 'template',
+        custom_card_image_url VARCHAR(500),
+        custom_card_overlay_data JSON,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         INDEX idx_user_id (user_id),
         INDEX idx_status (status),
-        INDEX idx_date (date)
+        INDEX idx_date (date),
+        INDEX idx_design_method (design_method)
       )
     `);
     // Ensure date_lang column exists (for legacy DBs)
@@ -125,6 +129,39 @@ const createTables = async () => {
     if (rsvpContactCol.length > 0 && rsvpContactCol[0].Type.toLowerCase() !== 'varchar(20)') {
       await connection.execute(`ALTER TABLE events MODIFY rsvp_contact VARCHAR(20)`);
       // console.log('✅ Updated rsvp_contact column to VARCHAR(20) in events table');
+    }
+
+    // Ensure custom card columns exist (for legacy DBs)
+    const [designMethodCol] = await connection.execute(`SHOW COLUMNS FROM events LIKE 'design_method'`);
+    if (designMethodCol.length === 0) {
+      await connection.execute(`ALTER TABLE events ADD COLUMN design_method ENUM('template', 'custom') DEFAULT 'template'`);
+      // console.log('✅ Added design_method column to events table');
+    }
+
+    const [customCardImageCol] = await connection.execute(`SHOW COLUMNS FROM events LIKE 'custom_card_image_url'`);
+    if (customCardImageCol.length === 0) {
+      await connection.execute(`ALTER TABLE events ADD COLUMN custom_card_image_url VARCHAR(500)`);
+      // console.log('✅ Added custom_card_image_url column to events table');
+    }
+
+    const [customCardOverlayCol] = await connection.execute(`SHOW COLUMNS FROM events LIKE 'custom_card_overlay_data'`);
+    if (customCardOverlayCol.length === 0) {
+      await connection.execute(`ALTER TABLE events ADD COLUMN custom_card_overlay_data JSON`);
+      // console.log('✅ Added custom_card_overlay_data column to events table');
+    }
+
+    // Ensure design_method index exists (for legacy DBs)
+    const [designMethodIndex] = await connection.execute(`SHOW INDEX FROM events WHERE Key_name = 'idx_design_method'`);
+    if (designMethodIndex.length === 0) {
+      await connection.execute(`CREATE INDEX idx_design_method ON events(design_method)`);
+      // console.log('✅ Added idx_design_method index to events table');
+    }
+
+    // Update date column to allow NULL for custom cards (for legacy DBs)
+    const [dateCol] = await connection.execute(`SHOW COLUMNS FROM events LIKE 'date'`);
+    if (dateCol.length > 0 && dateCol[0].Null === 'NO') {
+      await connection.execute(`ALTER TABLE events MODIFY date DATE NULL`);
+      // console.log('✅ Updated date column to allow NULL in events table');
     }
 
     // Event invitation data table

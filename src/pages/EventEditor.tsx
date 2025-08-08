@@ -199,8 +199,12 @@ const EventEditor = () => {
             console.log("[EventEditor] Setting invitation data:", newInvitationData);
             setInvitationData(newInvitationData);
 
-            // Set the selected template separately
-            setSelectedTemplate("template1");
+            // Set the selected template based on event design method
+            if (event.designMethod === 'custom' && event.customCardImageUrl) {
+              setSelectedTemplate("custom");
+            } else {
+              setSelectedTemplate("template1");
+            }
 
             // Clear the pending data after using it
             localStorage.removeItem("alika_pending_event_data");
@@ -327,6 +331,12 @@ const EventEditor = () => {
       name: "Artistic Layout",
       description: "Creative asymmetric design with dynamic positioning",
     },
+    ...(currentEvent?.designMethod === 'custom' && currentEvent?.customCardImageUrl ? {
+      custom: {
+        name: "Custom Uploaded Card",
+        description: "Your uploaded custom invitation card design",
+      }
+    } : {})
   };
 
   const handleInputChange = (field, value) => {

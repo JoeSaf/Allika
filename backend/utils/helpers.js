@@ -192,10 +192,6 @@ export const generateEventSlug = (title) => {
     .trim('-');
 };
 
-// Enhanced file upload security utilities
-import crypto from 'crypto';
-import path from 'path';
-
 // File type signatures (magic numbers)
 const FILE_SIGNATURES = {
   // Images
@@ -230,6 +226,16 @@ export const validateFileSignature = (buffer, expectedMimeType) => {
   const signature = FILE_SIGNATURES[expectedMimeType];
   if (!signature) return true; // No signature to check (e.g., CSV)
   
+  if (buffer.length < signature.length) return false;
+  
+  for (let i = 0; i < signature.length; i++) {
+    if (buffer[i] !== signature[i]) return false;
+  }
+  return true;
+};
+
+// Check if buffer matches a specific signature array
+export const bufferMatchesSignature = (buffer, signature) => {
   if (buffer.length < signature.length) return false;
   
   for (let i = 0; i < signature.length; i++) {
@@ -306,7 +312,7 @@ export const validateSecureFileUpload = (file, options = {}) => {
     ];
 
     for (const signature of executableSignatures) {
-      if (validateFileSignature(file.buffer, signature)) {
+      if (bufferMatchesSignature(file.buffer, signature)) {
         throw new Error('Executable files are not allowed.');
       }
     }
@@ -362,8 +368,8 @@ export const validateDocumentUpload = (file) => {
 // Rate limiting for file uploads
 const uploadAttempts = new Map();
 const UPLOAD_RATE_LIMIT = {
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  maxAttempts: 10 // 10 uploads per 15 minutes
+  windowMs: 5 * 60 * 1000, // 5 minutes (reduced from 15)
+  maxAttempts: 50 // 50 uploads per 5 minutes (increased from 10)
 };
 
 export const checkUploadRateLimit = (userId) => {
@@ -373,7 +379,15 @@ export const checkUploadRateLimit = (userId) => {
   // Remove old attempts
   const recentAttempts = userAttempts.filter(time => now - time < UPLOAD_RATE_LIMIT.windowMs);
   
+  // Debug logging with more details
+  console.log(`Rate limit check for user ${userId}:`);
+  console.log(`- Recent attempts: ${recentAttempts.length}/${UPLOAD_RATE_LIMIT.maxAttempts}`);
+  console.log(`- Time window: ${UPLOAD_RATE_LIMIT.windowMs}ms (${UPLOAD_RATE_LIMIT.windowMs / 60000} minutes)`);
+  console.log(`- Current time: ${now}`);
+  console.log(`- Recent attempt times:`, recentAttempts.map(t => new Date(t).toISOString()));
+  
   if (recentAttempts.length >= UPLOAD_RATE_LIMIT.maxAttempts) {
+    console.log(`Rate limit exceeded for user ${userId}`);
     throw new Error('Upload rate limit exceeded. Please try again later.');
   }
   
@@ -381,6 +395,7 @@ export const checkUploadRateLimit = (userId) => {
   recentAttempts.push(now);
   uploadAttempts.set(userId, recentAttempts);
   
+  console.log(`Rate limit check passed for user ${userId}`);
   return true;
 };
 
@@ -395,6 +410,28 @@ export const cleanupUploadRateLimits = () => {
       uploadAttempts.set(userId, recentAttempts);
     }
   }
+};
+
+// Clear rate limit for a specific user (for testing)
+export const clearUploadRateLimit = (userId) => {
+  uploadAttempts.delete(userId);
+  console.log(`Rate limit cleared for user ${userId}`);
+};
+
+// Get current rate limit status for a user (for debugging)
+export const getUploadRateLimitStatus = (userId) => {
+  const now = Date.now();
+  const userAttempts = uploadAttempts.get(userId) || [];
+  const recentAttempts = userAttempts.filter(time => now - time < UPLOAD_RATE_LIMIT.windowMs);
+  
+  return {
+    userId,
+    recentAttempts: recentAttempts.length,
+    maxAttempts: UPLOAD_RATE_LIMIT.maxAttempts,
+    windowMs: UPLOAD_RATE_LIMIT.windowMs,
+    isLimited: recentAttempts.length >= UPLOAD_RATE_LIMIT.maxAttempts,
+    attemptTimes: recentAttempts.map(t => new Date(t).toISOString())
+  };
 };
 
 // Generate random string
